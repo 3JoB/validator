@@ -5,13 +5,11 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"net"
 	"net/url"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,11 +17,12 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/gabriel-vasile/mimetype"
+	"github.com/goccy/go-json"
+	"github.com/goccy/go-reflect"
+	"github.com/leodido/go-urn"
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/text/language"
-
-	"github.com/gabriel-vasile/mimetype"
-	"github.com/leodido/go-urn"
 )
 
 // Func accepts a FieldLevel interface for all validation needs. The return
@@ -247,7 +246,7 @@ func parseOneOfParam2(s string) []string {
 		oneofValsCacheRWLock.Lock()
 		vals = splitParamsRegex.FindAllString(s, -1)
 		for i := 0; i < len(vals); i++ {
-			vals[i] = strings.Replace(vals[i], "'", "", -1)
+			vals[i] = strings.ReplaceAll(vals[i], "'", "")
 		}
 		oneofValsCache[s] = vals
 		oneofValsCacheRWLock.Unlock()
@@ -889,7 +888,6 @@ func isNeField(fl FieldLevel) bool {
 	}
 
 	switch kind {
-
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return field.Int() != currentField.Int()
 
@@ -910,7 +908,6 @@ func isNeField(fl FieldLevel) bool {
 		fieldType := field.Type()
 
 		if fieldType.ConvertibleTo(timeType) && currentField.Type().ConvertibleTo(timeType) {
-
 			t := currentField.Interface().(time.Time)
 			fieldTime := field.Interface().(time.Time)
 
@@ -949,7 +946,6 @@ func isLteCrossStructField(fl FieldLevel) bool {
 	}
 
 	switch kind {
-
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return field.Int() <= topField.Int()
 
@@ -967,7 +963,6 @@ func isLteCrossStructField(fl FieldLevel) bool {
 		fieldType := field.Type()
 
 		if fieldType.ConvertibleTo(timeType) && topField.Type().ConvertibleTo(timeType) {
-
 			fieldTime := field.Convert(timeType).Interface().(time.Time)
 			topTime := topField.Convert(timeType).Interface().(time.Time)
 
@@ -996,7 +991,6 @@ func isLtCrossStructField(fl FieldLevel) bool {
 	}
 
 	switch kind {
-
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return field.Int() < topField.Int()
 
@@ -1014,7 +1008,6 @@ func isLtCrossStructField(fl FieldLevel) bool {
 		fieldType := field.Type()
 
 		if fieldType.ConvertibleTo(timeType) && topField.Type().ConvertibleTo(timeType) {
-
 			fieldTime := field.Convert(timeType).Interface().(time.Time)
 			topTime := topField.Convert(timeType).Interface().(time.Time)
 
@@ -1042,7 +1035,6 @@ func isGteCrossStructField(fl FieldLevel) bool {
 	}
 
 	switch kind {
-
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return field.Int() >= topField.Int()
 
@@ -1060,7 +1052,6 @@ func isGteCrossStructField(fl FieldLevel) bool {
 		fieldType := field.Type()
 
 		if fieldType.ConvertibleTo(timeType) && topField.Type().ConvertibleTo(timeType) {
-
 			fieldTime := field.Convert(timeType).Interface().(time.Time)
 			topTime := topField.Convert(timeType).Interface().(time.Time)
 
@@ -1088,7 +1079,6 @@ func isGtCrossStructField(fl FieldLevel) bool {
 	}
 
 	switch kind {
-
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return field.Int() > topField.Int()
 
@@ -1106,7 +1096,6 @@ func isGtCrossStructField(fl FieldLevel) bool {
 		fieldType := field.Type()
 
 		if fieldType.ConvertibleTo(timeType) && topField.Type().ConvertibleTo(timeType) {
-
 			fieldTime := field.Convert(timeType).Interface().(time.Time)
 			topTime := topField.Convert(timeType).Interface().(time.Time)
 
@@ -1134,7 +1123,6 @@ func isNeCrossStructField(fl FieldLevel) bool {
 	}
 
 	switch kind {
-
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return topField.Int() != field.Int()
 
@@ -1155,7 +1143,6 @@ func isNeCrossStructField(fl FieldLevel) bool {
 		fieldType := field.Type()
 
 		if fieldType.ConvertibleTo(timeType) && topField.Type().ConvertibleTo(timeType) {
-
 			t := field.Convert(timeType).Interface().(time.Time)
 			fieldTime := topField.Convert(timeType).Interface().(time.Time)
 
@@ -1183,7 +1170,6 @@ func isEqCrossStructField(fl FieldLevel) bool {
 	}
 
 	switch kind {
-
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return topField.Int() == field.Int()
 
@@ -1204,7 +1190,6 @@ func isEqCrossStructField(fl FieldLevel) bool {
 		fieldType := field.Type()
 
 		if fieldType.ConvertibleTo(timeType) && topField.Type().ConvertibleTo(timeType) {
-
 			t := field.Convert(timeType).Interface().(time.Time)
 			fieldTime := topField.Convert(timeType).Interface().(time.Time)
 
@@ -1232,7 +1217,6 @@ func isEqField(fl FieldLevel) bool {
 	}
 
 	switch kind {
-
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return field.Int() == currentField.Int()
 
@@ -1253,7 +1237,6 @@ func isEqField(fl FieldLevel) bool {
 		fieldType := field.Type()
 
 		if fieldType.ConvertibleTo(timeType) && currentField.Type().ConvertibleTo(timeType) {
-
 			t := currentField.Convert(timeType).Interface().(time.Time)
 			fieldTime := field.Convert(timeType).Interface().(time.Time)
 
@@ -1276,7 +1259,6 @@ func isEq(fl FieldLevel) bool {
 	param := fl.Param()
 
 	switch field.Kind() {
-
 	case reflect.String:
 		return field.String() == param
 
@@ -1322,7 +1304,6 @@ func isEqIgnoreCase(fl FieldLevel) bool {
 	param := fl.Param()
 
 	switch field.Kind() {
-
 	case reflect.String:
 		return strings.EqualFold(field.String(), param)
 	}
@@ -1561,7 +1542,6 @@ func isImage(fl FieldLevel) bool {
 
 // isFilePath is the validation function for validating if the current field's value is a valid file path.
 func isFilePath(fl FieldLevel) bool {
-
 	var exists bool
 	var err error
 
@@ -1758,7 +1738,6 @@ func requireCheckFieldValue(
 	}
 
 	switch kind {
-
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return field.Int() == asInt(value)
 
@@ -1960,7 +1939,6 @@ func isGteField(fl FieldLevel) bool {
 	}
 
 	switch kind {
-
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 
 		return field.Int() >= currentField.Int()
@@ -1978,7 +1956,6 @@ func isGteField(fl FieldLevel) bool {
 		fieldType := field.Type()
 
 		if fieldType.ConvertibleTo(timeType) && currentField.Type().ConvertibleTo(timeType) {
-
 			t := currentField.Convert(timeType).Interface().(time.Time)
 			fieldTime := field.Convert(timeType).Interface().(time.Time)
 
@@ -2006,7 +1983,6 @@ func isGtField(fl FieldLevel) bool {
 	}
 
 	switch kind {
-
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 
 		return field.Int() > currentField.Int()
@@ -2024,7 +2000,6 @@ func isGtField(fl FieldLevel) bool {
 		fieldType := field.Type()
 
 		if fieldType.ConvertibleTo(timeType) && currentField.Type().ConvertibleTo(timeType) {
-
 			t := currentField.Convert(timeType).Interface().(time.Time)
 			fieldTime := field.Convert(timeType).Interface().(time.Time)
 
@@ -2047,7 +2022,6 @@ func isGte(fl FieldLevel) bool {
 	param := fl.Param()
 
 	switch field.Kind() {
-
 	case reflect.String:
 		p := asInt(param)
 
@@ -2081,7 +2055,6 @@ func isGte(fl FieldLevel) bool {
 	case reflect.Struct:
 
 		if field.Type().ConvertibleTo(timeType) {
-
 			now := time.Now().UTC()
 			t := field.Convert(timeType).Interface().(time.Time)
 
@@ -2098,7 +2071,6 @@ func isGt(fl FieldLevel) bool {
 	param := fl.Param()
 
 	switch field.Kind() {
-
 	case reflect.String:
 		p := asInt(param)
 
@@ -2132,7 +2104,6 @@ func isGt(fl FieldLevel) bool {
 	case reflect.Struct:
 
 		if field.Type().ConvertibleTo(timeType) {
-
 			return field.Convert(timeType).Interface().(time.Time).After(time.Now().UTC())
 		}
 	}
@@ -2146,7 +2117,6 @@ func hasLengthOf(fl FieldLevel) bool {
 	param := fl.Param()
 
 	switch field.Kind() {
-
 	case reflect.String:
 		p := asInt(param)
 
@@ -2197,7 +2167,6 @@ func isLteField(fl FieldLevel) bool {
 	}
 
 	switch kind {
-
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 
 		return field.Int() <= currentField.Int()
@@ -2215,7 +2184,6 @@ func isLteField(fl FieldLevel) bool {
 		fieldType := field.Type()
 
 		if fieldType.ConvertibleTo(timeType) && currentField.Type().ConvertibleTo(timeType) {
-
 			t := currentField.Convert(timeType).Interface().(time.Time)
 			fieldTime := field.Convert(timeType).Interface().(time.Time)
 
@@ -2243,7 +2211,6 @@ func isLtField(fl FieldLevel) bool {
 	}
 
 	switch kind {
-
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 
 		return field.Int() < currentField.Int()
@@ -2261,7 +2228,6 @@ func isLtField(fl FieldLevel) bool {
 		fieldType := field.Type()
 
 		if fieldType.ConvertibleTo(timeType) && currentField.Type().ConvertibleTo(timeType) {
-
 			t := currentField.Convert(timeType).Interface().(time.Time)
 			fieldTime := field.Convert(timeType).Interface().(time.Time)
 
@@ -2284,7 +2250,6 @@ func isLte(fl FieldLevel) bool {
 	param := fl.Param()
 
 	switch field.Kind() {
-
 	case reflect.String:
 		p := asInt(param)
 
@@ -2318,7 +2283,6 @@ func isLte(fl FieldLevel) bool {
 	case reflect.Struct:
 
 		if field.Type().ConvertibleTo(timeType) {
-
 			now := time.Now().UTC()
 			t := field.Convert(timeType).Interface().(time.Time)
 
@@ -2335,7 +2299,6 @@ func isLt(fl FieldLevel) bool {
 	param := fl.Param()
 
 	switch field.Kind() {
-
 	case reflect.String:
 		p := asInt(param)
 
@@ -2369,7 +2332,6 @@ func isLt(fl FieldLevel) bool {
 	case reflect.Struct:
 
 		if field.Type().ConvertibleTo(timeType) {
-
 			return field.Convert(timeType).Interface().(time.Time).Before(time.Now().UTC())
 		}
 	}
@@ -2549,7 +2511,6 @@ func isDir(fl FieldLevel) bool {
 
 // isDirPath is the validation function for validating if the current field's value is a valid directory.
 func isDirPath(fl FieldLevel) bool {
-
 	var exists bool
 	var err error
 

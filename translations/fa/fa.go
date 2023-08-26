@@ -3,14 +3,15 @@ package fa
 import (
 	"fmt"
 	"log"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-playground/locales"
 	ut "github.com/go-playground/universal-translator"
-	"github.com/go-playground/validator/v10"
+	"github.com/goccy/go-reflect"
+
+	"github.com/3JoB/validator"
 )
 
 // RegisterDefaultTranslations registers a set of default translations
@@ -1349,7 +1350,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 	}
 
 	for _, t := range translations {
-
 		if t.customTransFunc != nil && t.customRegisFunc != nil {
 			err = v.RegisterTranslation(t.tag, trans, t.customRegisFunc, t.customTransFunc)
 		} else if t.customTransFunc != nil && t.customRegisFunc == nil {

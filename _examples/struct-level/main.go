@@ -3,10 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strings"
 
-	"github.com/go-playground/validator/v10"
+	"github.com/goccy/go-reflect"
+
+	"github.com/3JoB/validator"
 )
 
 type validationError struct {
@@ -62,7 +63,6 @@ type Address struct {
 var validate *validator.Validate
 
 func main() {
-
 	validate = validator.New()
 
 	// register function to get tag name from json tags.
@@ -110,7 +110,6 @@ func main() {
 	// returns InvalidValidationError for bad validation input, nil or ValidationErrors ( []FieldError )
 	err = validate.Struct(user)
 	if err != nil {
-
 		// this check is only needed when your code could produce
 		// an invalid value for validation such as interface with nil
 		// value most including myself do not usually have code like this.
@@ -160,7 +159,6 @@ func main() {
 // hooks right into validator and you can combine with validation tags and still have a
 // common error output format.
 func UserStructLevelValidation(sl validator.StructLevel) {
-
 	user := sl.Current().Interface().(User)
 
 	if len(user.FirstName) == 0 && len(user.LastName) == 0 {

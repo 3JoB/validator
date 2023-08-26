@@ -5,7 +5,7 @@ Package validator
 [![Build Status](https://travis-ci.org/go-playground/validator.svg?branch=master)](https://travis-ci.org/go-playground/validator)
 [![Coverage Status](https://coveralls.io/repos/go-playground/validator/badge.svg?branch=master&service=github)](https://coveralls.io/github/go-playground/validator?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/go-playground/validator)](https://goreportcard.com/report/github.com/go-playground/validator)
-[![GoDoc](https://godoc.org/github.com/go-playground/validator?status.svg)](https://pkg.go.dev/github.com/go-playground/validator/v10)
+[![GoDoc](https://godoc.org/github.com/go-playground/validator?status.svg)](https://pkg.go.dev/github.com/3JoB/validator)
 ![License](https://img.shields.io/dub/l/vibe-d.svg)
 
 Package validator implements value validations for structs and individual fields based on tags.
@@ -27,11 +27,11 @@ Installation
 
 Use go get.
 
-	go get github.com/go-playground/validator/v10
+	go get github.com/3JoB/validator
 
 Then import the validator package into your own code.
 
-	import "github.com/go-playground/validator/v10"
+	import "github.com/3JoB/validator"
 
 Error Return Value
 -------
@@ -53,7 +53,7 @@ validationErrors := err.(validator.ValidationErrors)
 Usage and documentation
 ------
 
-Please see https://pkg.go.dev/github.com/go-playground/validator/v10 for detailed usage docs.
+Please see https://pkg.go.dev/github.com/3JoB/validator for detailed usage docs.
 
 ##### Examples:
 

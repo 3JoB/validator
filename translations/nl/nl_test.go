@@ -7,11 +7,11 @@ import (
 	. "github.com/go-playground/assert/v2"
 	english "github.com/go-playground/locales/en"
 	ut "github.com/go-playground/universal-translator"
-	"github.com/go-playground/validator/v10"
+
+	"github.com/3JoB/validator"
 )
 
 func TestTranslations(t *testing.T) {
-
 	eng := english.New()
 	uni := ut.New(eng, eng)
 	trans, _ := uni.GetTranslator("en")
@@ -139,7 +139,7 @@ func TestTranslations(t *testing.T) {
 		StrPtrGte         *string   `validate:"gte=10"`
 		OneOfString       string    `validate:"oneof=red green"`
 		OneOfInt          int       `validate:"oneof=5 63"`
-		Image			  string			`validate:"image"`
+		Image             string    `validate:"image"`
 	}
 
 	var test Test
@@ -621,13 +621,12 @@ func TestTranslations(t *testing.T) {
 			expected: "OneOfInt moet een van de volgende zijn [5 63]",
 		},
 		{
-			ns: "Test.Image",
+			ns:       "Test.Image",
 			expected: "Image moet een geldige afbeelding zijn",
 		},
 	}
 
 	for _, tt := range tests {
-
 		var fe validator.FieldError
 
 		for _, e := range errs {
@@ -640,5 +639,4 @@ func TestTranslations(t *testing.T) {
 		NotEqual(t, fe, nil)
 		Equal(t, tt.expected, fe.Translate(trans))
 	}
-
 }

@@ -3,20 +3,20 @@ package zh
 import (
 	"fmt"
 	"log"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-playground/locales"
 	ut "github.com/go-playground/universal-translator"
-	"github.com/go-playground/validator/v10"
+	"github.com/goccy/go-reflect"
+
+	"github.com/3JoB/validator"
 )
 
 // RegisterDefaultTranslations registers a set of default translations
 // for all built in tag's in validator; you may add your own as desired.
 func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (err error) {
-
 	translations := []struct {
 		tag             string
 		translation     string
@@ -62,14 +62,13 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 		{
 			tag: "len",
 			customRegisFunc: func(ut ut.Translator) (err error) {
-
 				if err = ut.Add("len-string", "{0}长度必须是{1}", false); err != nil {
 					return
 				}
 
-				//if err = ut.AddCardinal("len-string-character", "{0}字符", locales.PluralRuleOne, false); err != nil {
+				// if err = ut.AddCardinal("len-string-character", "{0}字符", locales.PluralRuleOne, false); err != nil {
 				//	return
-				//}
+				// }
 
 				if err = ut.AddCardinal("len-string-character", "{0}个字符", locales.PluralRuleOther, false); err != nil {
 					return
@@ -82,19 +81,17 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				if err = ut.Add("len-items", "{0}必须包含{1}", false); err != nil {
 					return
 				}
-				//if err = ut.AddCardinal("len-items-item", "{0}项", locales.PluralRuleOne, false); err != nil {
+				// if err = ut.AddCardinal("len-items-item", "{0}项", locales.PluralRuleOne, false); err != nil {
 				//	return
-				//}
+				// }
 
 				if err = ut.AddCardinal("len-items-item", "{0}项", locales.PluralRuleOther, false); err != nil {
 					return
 				}
 
 				return
-
 			},
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				var err error
 				var t string
 
@@ -153,14 +150,13 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 		{
 			tag: "min",
 			customRegisFunc: func(ut ut.Translator) (err error) {
-
 				if err = ut.Add("min-string", "{0}长度必须至少为{1}", false); err != nil {
 					return
 				}
 
-				//if err = ut.AddCardinal("min-string-character", "{0}个字符", locales.PluralRuleOne, false); err != nil {
+				// if err = ut.AddCardinal("min-string-character", "{0}个字符", locales.PluralRuleOne, false); err != nil {
 				//	return
-				//}
+				// }
 
 				if err = ut.AddCardinal("min-string-character", "{0}个字符", locales.PluralRuleOther, false); err != nil {
 					return
@@ -173,19 +169,17 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				if err = ut.Add("min-items", "{0}必须至少包含{1}", false); err != nil {
 					return
 				}
-				//if err = ut.AddCardinal("min-items-item", "{0}项", locales.PluralRuleOne, false); err != nil {
+				// if err = ut.AddCardinal("min-items-item", "{0}项", locales.PluralRuleOne, false); err != nil {
 				//	return
-				//}
+				// }
 
 				if err = ut.AddCardinal("min-items-item", "{0}项", locales.PluralRuleOther, false); err != nil {
 					return
 				}
 
 				return
-
 			},
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				var err error
 				var t string
 
@@ -244,14 +238,13 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 		{
 			tag: "max",
 			customRegisFunc: func(ut ut.Translator) (err error) {
-
 				if err = ut.Add("max-string", "{0}长度不能超过{1}", false); err != nil {
 					return
 				}
 
-				//if err = ut.AddCardinal("max-string-character", "{0}个字符", locales.PluralRuleOne, false); err != nil {
+				// if err = ut.AddCardinal("max-string-character", "{0}个字符", locales.PluralRuleOne, false); err != nil {
 				//	return
-				//}
+				// }
 
 				if err = ut.AddCardinal("max-string-character", "{0}个字符", locales.PluralRuleOther, false); err != nil {
 					return
@@ -264,19 +257,17 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				if err = ut.Add("max-items", "{0}最多只能包含{1}", false); err != nil {
 					return
 				}
-				//if err = ut.AddCardinal("max-items-item", "{0}项", locales.PluralRuleOne, false); err != nil {
+				// if err = ut.AddCardinal("max-items-item", "{0}项", locales.PluralRuleOne, false); err != nil {
 				//	return
-				//}
+				// }
 
 				if err = ut.AddCardinal("max-items-item", "{0}项", locales.PluralRuleOther, false); err != nil {
 					return
 				}
 
 				return
-
 			},
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				var err error
 				var t string
 
@@ -337,7 +328,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}不等于{1}",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					fmt.Printf("警告: 翻译字段错误: %#v", fe)
@@ -352,7 +342,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}不能等于{1}",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					fmt.Printf("警告: 翻译字段错误: %#v", fe)
@@ -365,14 +354,13 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 		{
 			tag: "lt",
 			customRegisFunc: func(ut ut.Translator) (err error) {
-
 				if err = ut.Add("lt-string", "{0}长度必须小于{1}", false); err != nil {
 					return
 				}
 
-				//if err = ut.AddCardinal("lt-string-character", "{0}个字符", locales.PluralRuleOne, false); err != nil {
+				// if err = ut.AddCardinal("lt-string-character", "{0}个字符", locales.PluralRuleOne, false); err != nil {
 				//	return
-				//}
+				// }
 
 				if err = ut.AddCardinal("lt-string-character", "{0}个字符", locales.PluralRuleOther, false); err != nil {
 					return
@@ -386,9 +374,9 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 					return
 				}
 
-				//if err = ut.AddCardinal("lt-items-item", "{0}项", locales.PluralRuleOne, false); err != nil {
+				// if err = ut.AddCardinal("lt-items-item", "{0}项", locales.PluralRuleOne, false); err != nil {
 				//	return
-				//}
+				// }
 
 				if err = ut.AddCardinal("lt-items-item", "{0}项", locales.PluralRuleOther, false); err != nil {
 					return
@@ -399,10 +387,8 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				}
 
 				return
-
 			},
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				var err error
 				var t string
 				var f64 float64
@@ -410,7 +396,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				var kind reflect.Kind
 
 				fn := func() (err error) {
-
 					if idx := strings.Index(fe.Param(), "."); idx != -1 {
 						digits = uint64(len(fe.Param()[idx+1:]))
 					}
@@ -485,14 +470,13 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 		{
 			tag: "lte",
 			customRegisFunc: func(ut ut.Translator) (err error) {
-
 				if err = ut.Add("lte-string", "{0}长度不能超过{1}", false); err != nil {
 					return
 				}
 
-				//if err = ut.AddCardinal("lte-string-character", "{0} character", locales.PluralRuleOne, false); err != nil {
+				// if err = ut.AddCardinal("lte-string-character", "{0} character", locales.PluralRuleOne, false); err != nil {
 				//	return
-				//}
+				// }
 
 				if err = ut.AddCardinal("lte-string-character", "{0}个字符", locales.PluralRuleOther, false); err != nil {
 					return
@@ -506,9 +490,9 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 					return
 				}
 
-				//if err = ut.AddCardinal("lte-items-item", "{0} item", locales.PluralRuleOne, false); err != nil {
+				// if err = ut.AddCardinal("lte-items-item", "{0} item", locales.PluralRuleOne, false); err != nil {
 				//	return
-				//}
+				// }
 
 				if err = ut.AddCardinal("lte-items-item", "{0}项", locales.PluralRuleOther, false); err != nil {
 					return
@@ -521,7 +505,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				return
 			},
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				var err error
 				var t string
 				var f64 float64
@@ -529,7 +512,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				var kind reflect.Kind
 
 				fn := func() (err error) {
-
 					if idx := strings.Index(fe.Param(), "."); idx != -1 {
 						digits = uint64(len(fe.Param()[idx+1:]))
 					}
@@ -604,14 +586,13 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 		{
 			tag: "gt",
 			customRegisFunc: func(ut ut.Translator) (err error) {
-
 				if err = ut.Add("gt-string", "{0}长度必须大于{1}", false); err != nil {
 					return
 				}
 
-				//if err = ut.AddCardinal("gt-string-character", "{0}个字符", locales.PluralRuleOne, false); err != nil {
+				// if err = ut.AddCardinal("gt-string-character", "{0}个字符", locales.PluralRuleOne, false); err != nil {
 				//	return
-				//}
+				// }
 
 				if err = ut.AddCardinal("gt-string-character", "{0}个字符", locales.PluralRuleOther, false); err != nil {
 					return
@@ -625,9 +606,9 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 					return
 				}
 
-				//if err = ut.AddCardinal("gt-items-item", "{0}项", locales.PluralRuleOne, false); err != nil {
+				// if err = ut.AddCardinal("gt-items-item", "{0}项", locales.PluralRuleOne, false); err != nil {
 				//	return
-				//}
+				// }
 
 				if err = ut.AddCardinal("gt-items-item", "{0}项", locales.PluralRuleOther, false); err != nil {
 					return
@@ -640,7 +621,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				return
 			},
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				var err error
 				var t string
 				var f64 float64
@@ -648,7 +628,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				var kind reflect.Kind
 
 				fn := func() (err error) {
-
 					if idx := strings.Index(fe.Param(), "."); idx != -1 {
 						digits = uint64(len(fe.Param()[idx+1:]))
 					}
@@ -699,7 +678,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 					if fe.Type() != reflect.TypeOf(time.Time{}) {
 						err = fmt.Errorf("tag '%s'不能用于struct类型.", fe.Tag())
 					} else {
-
 						t, err = ut.T("gt-datetime", fe.Field())
 					}
 
@@ -724,14 +702,13 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 		{
 			tag: "gte",
 			customRegisFunc: func(ut ut.Translator) (err error) {
-
 				if err = ut.Add("gte-string", "{0}长度必须至少为{1}", false); err != nil {
 					return
 				}
 
-				//if err = ut.AddCardinal("gte-string-character", "{0}个字符", locales.PluralRuleOne, false); err != nil {
+				// if err = ut.AddCardinal("gte-string-character", "{0}个字符", locales.PluralRuleOne, false); err != nil {
 				//	return
-				//}
+				// }
 
 				if err = ut.AddCardinal("gte-string-character", "{0}个字符", locales.PluralRuleOther, false); err != nil {
 					return
@@ -745,9 +722,9 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 					return
 				}
 
-				//if err = ut.AddCardinal("gte-items-item", "{0}项", locales.PluralRuleOne, false); err != nil {
+				// if err = ut.AddCardinal("gte-items-item", "{0}项", locales.PluralRuleOne, false); err != nil {
 				//	return
-				//}
+				// }
 
 				if err = ut.AddCardinal("gte-items-item", "{0}项", locales.PluralRuleOther, false); err != nil {
 					return
@@ -760,7 +737,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				return
 			},
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				var err error
 				var t string
 				var f64 float64
@@ -768,7 +744,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				var kind reflect.Kind
 
 				fn := func() (err error) {
-
 					if idx := strings.Index(fe.Param(), "."); idx != -1 {
 						digits = uint64(len(fe.Param()[idx+1:]))
 					}
@@ -845,7 +820,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}必须等于{1}",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -860,7 +834,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}必须等于{1}",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -875,7 +848,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}不能等于{1}",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -890,7 +862,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}必须大于{1}",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -905,7 +876,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}必须大于或等于{1}",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -920,7 +890,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}必须小于{1}",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -935,7 +904,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}必须小于或等于{1}",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -950,7 +918,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}不能等于{1}",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -965,7 +932,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}必须大于{1}",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -980,7 +946,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}必须大于或等于{1}",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -995,7 +960,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}必须小于{1}",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -1010,7 +974,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}必须小于或等于{1}",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -1105,7 +1068,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}必须包含文本'{1}'",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -1120,7 +1082,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}必须包含至少一个以下字符'{1}'",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -1135,7 +1096,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}必须包含字符'{1}'",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -1150,7 +1110,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}不能包含文本'{1}'",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -1165,7 +1124,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}不能包含以下任何字符'{1}'",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -1180,7 +1138,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}不能包含'{1}'",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -1195,7 +1152,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}必须以文本'{1}'结尾",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -1210,7 +1166,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}必须以文本'{1}'开头",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -1418,7 +1373,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			translation: "{0}的格式必须是{1}",
 			override:    false,
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				t, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
 				if err != nil {
 					log.Printf("警告: 翻译字段错误: %#v", fe)
@@ -1436,19 +1390,12 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 	}
 
 	for _, t := range translations {
-
 		if t.customTransFunc != nil && t.customRegisFunc != nil {
-
 			err = v.RegisterTranslation(t.tag, trans, t.customRegisFunc, t.customTransFunc)
-
 		} else if t.customTransFunc != nil && t.customRegisFunc == nil {
-
 			err = v.RegisterTranslation(t.tag, trans, registrationFunc(t.tag, t.translation, t.override), t.customTransFunc)
-
 		} else if t.customTransFunc == nil && t.customRegisFunc != nil {
-
 			err = v.RegisterTranslation(t.tag, trans, t.customRegisFunc, translateFunc)
-
 		} else {
 			err = v.RegisterTranslation(t.tag, trans, registrationFunc(t.tag, t.translation, t.override), translateFunc)
 		}
@@ -1462,21 +1409,16 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 }
 
 func registrationFunc(tag string, translation string, override bool) validator.RegisterTranslationsFunc {
-
 	return func(ut ut.Translator) (err error) {
-
 		if err = ut.Add(tag, translation, override); err != nil {
 			return
 		}
 
 		return
-
 	}
-
 }
 
 func translateFunc(ut ut.Translator, fe validator.FieldError) string {
-
 	t, err := ut.T(fe.Tag(), fe.Field())
 	if err != nil {
 		log.Printf("警告: 翻译字段错误: %#v", fe)

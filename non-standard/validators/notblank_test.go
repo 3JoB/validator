@@ -4,16 +4,17 @@ import (
 	"testing"
 
 	"github.com/go-playground/assert/v2"
-	"github.com/go-playground/validator/v10"
+
+	"github.com/3JoB/validator"
 )
 
 type test struct {
-	String    string      `validate:"notblank"`
-	Array     []int       `validate:"notblank"`
-	Pointer   *int        `validate:"notblank"`
-	Number    int         `validate:"notblank"`
-	Interface interface{} `validate:"notblank"`
-	Func      func()      `validate:"notblank"`
+	String    string `validate:"notblank"`
+	Array     []int  `validate:"notblank"`
+	Pointer   *int   `validate:"notblank"`
+	Number    int    `validate:"notblank"`
+	Interface any    `validate:"notblank"`
+	Func      func() `validate:"notblank"`
 }
 
 func TestNotBlank(t *testing.T) {

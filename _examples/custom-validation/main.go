@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/go-playground/validator/v10"
+	"github.com/3JoB/validator"
 )
 
 // MyStruct ..
@@ -15,7 +15,6 @@ type MyStruct struct {
 var validate *validator.Validate
 
 func main() {
-
 	validate = validator.New()
 	validate.RegisterValidation("is-awesome", ValidateMyVal)
 

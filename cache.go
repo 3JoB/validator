@@ -2,10 +2,11 @@ package validator
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/goccy/go-reflect"
 )
 
 type tagType uint8
@@ -123,7 +124,6 @@ func (v *Validate) extractStructCache(current reflect.Value, sName string) *cStr
 	var customName string
 
 	for i := 0; i < numFields; i++ {
-
 		fld = typ.Field(i)
 
 		if !fld.Anonymous && len(fld.PkgPath) > 0 {
@@ -190,7 +190,6 @@ func (v *Validate) parseFieldTagsRecursive(tag string, field reflect.StructField
 			} else {
 				next, curr := v.parseFieldTagsRecursive(tagsVal, field, t, true)
 				current.next, current = next, curr
-
 			}
 			continue
 		}
@@ -227,7 +226,6 @@ func (v *Validate) parseFieldTagsRecursive(tag string, field reflect.StructField
 			i++
 
 			for ; i < len(tags); i++ {
-
 				b = append(b, tags[i]...)
 				b = append(b, ',')
 
@@ -304,7 +302,7 @@ func (v *Validate) parseFieldTagsRecursive(tag string, field reflect.StructField
 				}
 
 				if len(vals) > 1 {
-					current.param = strings.Replace(strings.Replace(vals[1], utf8HexComma, ",", -1), utf8Pipe, "|", -1)
+					current.param = strings.ReplaceAll(strings.ReplaceAll(vals[1], utf8HexComma, ","), utf8Pipe, "|")
 				}
 			}
 			current.isBlockEnd = true

@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/go-playground/validator/v10"
+
+	"github.com/3JoB/validator"
 )
 
 type Data struct {

@@ -4,9 +4,10 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	"reflect"
 
-	"github.com/go-playground/validator/v10"
+	"github.com/goccy/go-reflect"
+
+	"github.com/3JoB/validator"
 )
 
 // DbBackedUser User struct
@@ -19,7 +20,6 @@ type DbBackedUser struct {
 var validate *validator.Validate
 
 func main() {
-
 	validate = validator.New()
 
 	// register all sql.Null* types to use the ValidateValuer CustomTypeFunc
@@ -36,10 +36,8 @@ func main() {
 }
 
 // ValidateValuer implements validator.CustomTypeFunc
-func ValidateValuer(field reflect.Value) interface{} {
-
+func ValidateValuer(field reflect.Value) any {
 	if valuer, ok := field.Interface().(driver.Valuer); ok {
-
 		val, err := valuer.Value()
 		if err == nil {
 			return val

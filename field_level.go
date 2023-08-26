@@ -1,11 +1,10 @@
 package validator
 
-import "reflect"
+import "github.com/goccy/go-reflect"
 
 // FieldLevel contains all the information and helper functions
 // to validate a field
 type FieldLevel interface {
-
 	// Top returns the top level struct, if any
 	Top() reflect.Value
 

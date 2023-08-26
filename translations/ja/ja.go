@@ -3,14 +3,15 @@ package ja
 import (
 	"fmt"
 	"log"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-playground/locales"
 	ut "github.com/go-playground/universal-translator"
-	"github.com/go-playground/validator/v10"
+	"github.com/goccy/go-reflect"
+
+	"github.com/3JoB/validator"
 )
 
 // RegisterDefaultTranslations registers a set of default translations
@@ -64,7 +65,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				}
 
 				return
-
 			},
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
 				var err error
@@ -153,7 +153,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				}
 
 				return
-
 			},
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
 				var err error
@@ -242,10 +241,8 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				}
 
 				return
-
 			},
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				var err error
 				var t string
 
@@ -337,7 +334,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				return
 			},
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				var err error
 				var t string
 				var f64 float64
@@ -345,7 +341,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				var kind reflect.Kind
 
 				fn := func() (err error) {
-
 					if idx := strings.Index(fe.Param(), "."); idx != -1 {
 						digits = uint64(len(fe.Param()[idx+1:]))
 					}
@@ -422,10 +417,8 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				}
 
 				return
-
 			},
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				var err error
 				var t string
 				var f64 float64
@@ -433,7 +426,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				var kind reflect.Kind
 
 				fn := func() (err error) {
-
 					if idx := strings.Index(fe.Param(), "."); idx != -1 {
 						digits = uint64(len(fe.Param()[idx+1:]))
 					}
@@ -544,7 +536,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				return
 			},
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				var err error
 				var t string
 				var f64 float64
@@ -552,7 +543,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				var kind reflect.Kind
 
 				fn := func() (err error) {
-
 					if idx := strings.Index(fe.Param(), "."); idx != -1 {
 						digits = uint64(len(fe.Param()[idx+1:]))
 					}
@@ -663,7 +653,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				return
 			},
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				var err error
 				var t string
 				var f64 float64
@@ -671,7 +660,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				var kind reflect.Kind
 
 				fn := func() (err error) {
-
 					if idx := strings.Index(fe.Param(), "."); idx != -1 {
 						digits = uint64(len(fe.Param()[idx+1:]))
 					}
@@ -782,7 +770,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				return
 			},
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				var err error
 				var t string
 				var f64 float64
@@ -790,7 +777,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				var kind reflect.Kind
 
 				fn := func() (err error) {
-
 					if idx := strings.Index(fe.Param(), "."); idx != -1 {
 						digits = uint64(len(fe.Param()[idx+1:]))
 					}
@@ -1429,7 +1415,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 	}
 
 	for _, t := range translations {
-
 		if t.customTransFunc != nil && t.customRegisFunc != nil {
 			err = v.RegisterTranslation(t.tag, trans, t.customRegisFunc, t.customTransFunc)
 		} else if t.customTransFunc != nil && t.customRegisFunc == nil {
@@ -1455,9 +1440,7 @@ func registrationFunc(tag string, translation string, override bool) validator.R
 		}
 
 		return
-
 	}
-
 }
 
 func translateFunc(ut ut.Translator, fe validator.FieldError) string {

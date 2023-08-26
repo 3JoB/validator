@@ -8,11 +8,10 @@ import (
 	"github.com/go-playground/locales/pt"
 	ut "github.com/go-playground/universal-translator"
 
-	"github.com/go-playground/validator/v10"
+	"github.com/3JoB/validator"
 )
 
 func TestTranslations(t *testing.T) {
-
 	pt := pt.New()
 	uni := ut.New(pt, pt)
 	trans, _ := uni.GetTranslator("pt")
@@ -147,7 +146,7 @@ func TestTranslations(t *testing.T) {
 		LowercaseString   string            `validate:"lowercase"`
 		UppercaseString   string            `validate:"uppercase"`
 		Datetime          string            `validate:"datetime=2006-01-02"`
-		Image			  string			`validate:"image"`
+		Image             string            `validate:"image"`
 	}
 
 	var test Test
@@ -664,13 +663,12 @@ func TestTranslations(t *testing.T) {
 			expected: "Datetime não está no formato 2006-01-02",
 		},
 		{
-			ns: "Test.Image",
+			ns:       "Test.Image",
 			expected: "Image deve ser uma imagem válida",
 		},
 	}
 
 	for _, tt := range tests {
-
 		var fe validator.FieldError
 
 		for _, e := range errs {
@@ -683,5 +681,4 @@ func TestTranslations(t *testing.T) {
 		NotEqual(t, fe, nil)
 		Equal(t, tt.expected, fe.Translate(trans))
 	}
-
 }

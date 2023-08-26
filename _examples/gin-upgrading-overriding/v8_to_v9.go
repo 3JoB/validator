@@ -1,11 +1,12 @@
 package main
 
 import (
-	"reflect"
 	"sync"
 
 	"github.com/gin-gonic/gin/binding"
-	"github.com/go-playground/validator/v10"
+	"github.com/goccy/go-reflect"
+
+	"github.com/3JoB/validator"
 )
 
 type defaultValidator struct {
@@ -15,10 +16,8 @@ type defaultValidator struct {
 
 var _ binding.StructValidator = &defaultValidator{}
 
-func (v *defaultValidator) ValidateStruct(obj interface{}) error {
-
+func (v *defaultValidator) ValidateStruct(obj any) error {
 	if kindOfData(obj) == reflect.Struct {
-
 		v.lazyinit()
 
 		if err := v.validate.Struct(obj); err != nil {
@@ -29,7 +28,7 @@ func (v *defaultValidator) ValidateStruct(obj interface{}) error {
 	return nil
 }
 
-func (v *defaultValidator) Engine() interface{} {
+func (v *defaultValidator) Engine() any {
 	v.lazyinit()
 	return v.validate
 }
@@ -43,8 +42,7 @@ func (v *defaultValidator) lazyinit() {
 	})
 }
 
-func kindOfData(data interface{}) reflect.Kind {
-
+func kindOfData(data any) reflect.Kind {
 	value := reflect.ValueOf(data)
 	valueType := value.Kind()
 

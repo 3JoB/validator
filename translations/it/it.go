@@ -3,14 +3,15 @@ package it
 import (
 	"fmt"
 	"log"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-playground/locales"
 	ut "github.com/go-playground/universal-translator"
-	"github.com/go-playground/validator/v10"
+	"github.com/goccy/go-reflect"
+
+	"github.com/3JoB/validator"
 )
 
 // RegisterDefaultTranslations registers a set of default translations
@@ -124,7 +125,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 		{
 			tag: "min",
 			customRegisFunc: func(ut ut.Translator) (err error) {
-
 				if err = ut.Add("min-string", "{0} deve essere lungo almeno {1}", false); err != nil {
 					return
 				}
@@ -327,7 +327,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				}
 
 				if err = ut.Add("lt-number", "{0} deve essere minore di {1}", false); err != nil {
-
 					return
 				}
 
@@ -432,7 +431,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 		{
 			tag: "lte",
 			customRegisFunc: func(ut ut.Translator) (err error) {
-
 				if err = ut.Add("lte-string", "{0} deve essere lungo al massimo {1}", false); err != nil {
 					return
 				}
@@ -468,7 +466,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				return
 			},
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				var err error
 				var t string
 				var f64 float64
@@ -551,7 +548,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 		{
 			tag: "gt",
 			customRegisFunc: func(ut ut.Translator) (err error) {
-
 				if err = ut.Add("gt-string", "{0} deve essere lungo più di {1}", false); err != nil {
 					return
 				}
@@ -587,7 +583,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				return
 			},
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				var err error
 				var t string
 				var f64 float64
@@ -705,7 +700,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				return
 			},
 			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-
 				var err error
 				var t string
 				var f64 float64

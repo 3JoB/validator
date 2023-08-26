@@ -5,8 +5,9 @@ import (
 
 	"github.com/go-playground/locales/en"
 	ut "github.com/go-playground/universal-translator"
-	"github.com/go-playground/validator/v10"
-	en_translations "github.com/go-playground/validator/v10/translations/en"
+
+	"github.com/3JoB/validator"
+	en_translations "github.com/3JoB/validator/translations/en"
 )
 
 // User contains user information
@@ -34,7 +35,6 @@ var (
 )
 
 func main() {
-
 	// NOTE: ommitting allot of error checking for brevity
 
 	en := en.New()
@@ -53,7 +53,6 @@ func main() {
 }
 
 func translateAll(trans ut.Translator) {
-
 	type User struct {
 		Username string `validate:"required"`
 		Tagline  string `validate:"required,lt=10"`
@@ -68,7 +67,6 @@ func translateAll(trans ut.Translator) {
 
 	err := validate.Struct(user)
 	if err != nil {
-
 		// translate all error at once
 		errs := err.(validator.ValidationErrors)
 
@@ -81,7 +79,6 @@ func translateAll(trans ut.Translator) {
 }
 
 func translateIndividual(trans ut.Translator) {
-
 	type User struct {
 		Username string `validate:"required"`
 	}
@@ -90,7 +87,6 @@ func translateIndividual(trans ut.Translator) {
 
 	err := validate.Struct(user)
 	if err != nil {
-
 		errs := err.(validator.ValidationErrors)
 
 		for _, e := range errs {
@@ -101,7 +97,6 @@ func translateIndividual(trans ut.Translator) {
 }
 
 func translateOverride(trans ut.Translator) {
-
 	validate.RegisterTranslation("required", trans, func(ut ut.Translator) error {
 		return ut.Add("required", "{0} must have a value!", true) // see universal-translator for details
 	}, func(ut ut.Translator, fe validator.FieldError) string {
@@ -118,7 +113,6 @@ func translateOverride(trans ut.Translator) {
 
 	err := validate.Struct(user)
 	if err != nil {
-
 		errs := err.(validator.ValidationErrors)
 
 		for _, e := range errs {

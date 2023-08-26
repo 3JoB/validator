@@ -6,14 +6,12 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"image"
 	"image/jpeg"
 	"image/png"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -23,6 +21,8 @@ import (
 	"github.com/go-playground/locales/fr"
 	"github.com/go-playground/locales/nl"
 	ut "github.com/go-playground/universal-translator"
+	"github.com/goccy/go-json"
+	"github.com/goccy/go-reflect"
 )
 
 // NOTES:
@@ -190,9 +190,8 @@ type MadeUpCustomType struct {
 	LastName  string
 }
 
-func ValidateCustomType(field reflect.Value) interface{} {
+func ValidateCustomType(field reflect.Value) any {
 	if cust, ok := field.Interface().(MadeUpCustomType); ok {
-
 		if len(cust.FirstName) == 0 || len(cust.LastName) == 0 {
 			return ""
 		}
@@ -203,7 +202,7 @@ func ValidateCustomType(field reflect.Value) interface{} {
 	return ""
 }
 
-func OverrideIntTypeForSomeReason(field reflect.Value) interface{} {
+func OverrideIntTypeForSomeReason(field reflect.Value) any {
 	if i, ok := field.Interface().(int); ok {
 		if i == 1 {
 			return "1"
@@ -222,9 +221,8 @@ type CustomMadeUpStruct struct {
 	OverriddenInt int              `validate:"gt=1"`
 }
 
-func ValidateValuerType(field reflect.Value) interface{} {
+func ValidateValuerType(field reflect.Value) any {
 	if valuer, ok := field.Interface().(driver.Valuer); ok {
-
 		val, err := valuer.Value()
 		if err != nil {
 			// handle the error how you want
@@ -501,7 +499,7 @@ func TestAnonymousSameStructDifferentTags(t *testing.T) {
 	})
 
 	type Test struct {
-		A interface{}
+		A any
 	}
 
 	tst := &Test{
@@ -783,8 +781,8 @@ func TestStructPartial(t *testing.T) {
 				Test      string `validate:"required"`
 				OtherTest string `validate:"required"`
 			}{
-				{"Required", "RequiredOther"},
-				{"Required", "RequiredOther"},
+				{Test: "Required", OtherTest: "RequiredOther"},
+				{Test: "Required", OtherTest: "RequiredOther"},
 			},
 		},
 	}
@@ -938,7 +936,7 @@ func TestStructPartial(t *testing.T) {
 	unnamedStruct := struct {
 		String string `validate:"required" json:"StringVal"`
 	}{String: "test"}
-	composedUnnamedStruct := struct{ *TestStruct }{&TestStruct{String: "test"}}
+	composedUnnamedStruct := struct{ *TestStruct }{TestStruct: &TestStruct{String: "test"}}
 
 	errs = validate.StructPartial(testStruct, "String")
 	Equal(t, errs, nil)
@@ -1104,18 +1102,18 @@ func TestCrossStructLteFieldValidation(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationInner = &TimeDurationInner{time.Hour + time.Minute}
-	timeDurationTest = &TimeDurationTest{timeDurationInner, time.Hour}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{Inner: timeDurationInner, Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationInner = &TimeDurationInner{time.Hour}
-	timeDurationTest = &TimeDurationTest{timeDurationInner, time.Hour}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour}
+	timeDurationTest = &TimeDurationTest{Inner: timeDurationInner, Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationInner = &TimeDurationInner{time.Hour - time.Minute}
-	timeDurationTest = &TimeDurationTest{timeDurationInner, time.Hour}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{Inner: timeDurationInner, Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "ltecsfield")
@@ -1126,8 +1124,8 @@ func TestCrossStructLteFieldValidation(t *testing.T) {
 	}
 	var timeDurationOmitemptyTest *TimeDurationOmitemptyTest
 
-	timeDurationInner = &TimeDurationInner{-time.Minute}
-	timeDurationOmitemptyTest = &TimeDurationOmitemptyTest{timeDurationInner, time.Duration(0)}
+	timeDurationInner = &TimeDurationInner{Duration: -time.Minute}
+	timeDurationOmitemptyTest = &TimeDurationOmitemptyTest{Inner: timeDurationInner, Duration: time.Duration(0)}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 }
@@ -1259,19 +1257,19 @@ func TestCrossStructLtFieldValidation(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationInner = &TimeDurationInner{time.Hour + time.Minute}
-	timeDurationTest = &TimeDurationTest{timeDurationInner, time.Hour}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{Inner: timeDurationInner, Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationInner = &TimeDurationInner{time.Hour}
-	timeDurationTest = &TimeDurationTest{timeDurationInner, time.Hour}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour}
+	timeDurationTest = &TimeDurationTest{Inner: timeDurationInner, Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "ltcsfield")
 
-	timeDurationInner = &TimeDurationInner{time.Hour - time.Minute}
-	timeDurationTest = &TimeDurationTest{timeDurationInner, time.Hour}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{Inner: timeDurationInner, Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "ltcsfield")
@@ -1282,8 +1280,8 @@ func TestCrossStructLtFieldValidation(t *testing.T) {
 	}
 	var timeDurationOmitemptyTest *TimeDurationOmitemptyTest
 
-	timeDurationInner = &TimeDurationInner{-time.Minute}
-	timeDurationOmitemptyTest = &TimeDurationOmitemptyTest{timeDurationInner, time.Duration(0)}
+	timeDurationInner = &TimeDurationInner{Duration: -time.Minute}
+	timeDurationOmitemptyTest = &TimeDurationOmitemptyTest{Inner: timeDurationInner, Duration: time.Duration(0)}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 }
@@ -1426,18 +1424,18 @@ func TestCrossStructGteFieldValidation(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationInner = &TimeDurationInner{time.Hour - time.Minute}
-	timeDurationTest = &TimeDurationTest{timeDurationInner, time.Hour}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{Inner: timeDurationInner, Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationInner = &TimeDurationInner{time.Hour}
-	timeDurationTest = &TimeDurationTest{timeDurationInner, time.Hour}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour}
+	timeDurationTest = &TimeDurationTest{Inner: timeDurationInner, Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationInner = &TimeDurationInner{time.Hour + time.Minute}
-	timeDurationTest = &TimeDurationTest{timeDurationInner, time.Hour}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{Inner: timeDurationInner, Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "gtecsfield")
@@ -1448,8 +1446,8 @@ func TestCrossStructGteFieldValidation(t *testing.T) {
 	}
 	var timeDurationOmitemptyTest *TimeDurationOmitemptyTest
 
-	timeDurationInner = &TimeDurationInner{time.Hour}
-	timeDurationOmitemptyTest = &TimeDurationOmitemptyTest{timeDurationInner, time.Duration(0)}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour}
+	timeDurationOmitemptyTest = &TimeDurationOmitemptyTest{Inner: timeDurationInner, Duration: time.Duration(0)}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 }
@@ -1581,19 +1579,19 @@ func TestCrossStructGtFieldValidation(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationInner = &TimeDurationInner{time.Hour - time.Minute}
-	timeDurationTest = &TimeDurationTest{timeDurationInner, time.Hour}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{Inner: timeDurationInner, Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationInner = &TimeDurationInner{time.Hour}
-	timeDurationTest = &TimeDurationTest{timeDurationInner, time.Hour}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour}
+	timeDurationTest = &TimeDurationTest{Inner: timeDurationInner, Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "gtcsfield")
 
-	timeDurationInner = &TimeDurationInner{time.Hour + time.Minute}
-	timeDurationTest = &TimeDurationTest{timeDurationInner, time.Hour}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{Inner: timeDurationInner, Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "gtcsfield")
@@ -1604,8 +1602,8 @@ func TestCrossStructGtFieldValidation(t *testing.T) {
 	}
 	var timeDurationOmitemptyTest *TimeDurationOmitemptyTest
 
-	timeDurationInner = &TimeDurationInner{time.Hour}
-	timeDurationOmitemptyTest = &TimeDurationOmitemptyTest{timeDurationInner, time.Duration(0)}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour}
+	timeDurationOmitemptyTest = &TimeDurationOmitemptyTest{Inner: timeDurationInner, Duration: time.Duration(0)}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 }
@@ -1754,18 +1752,18 @@ func TestCrossStructNeFieldValidation(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationInner = &TimeDurationInner{time.Hour - time.Minute}
-	timeDurationTest = &TimeDurationTest{timeDurationInner, time.Hour}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{Inner: timeDurationInner, Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationInner = &TimeDurationInner{time.Hour + time.Minute}
-	timeDurationTest = &TimeDurationTest{timeDurationInner, time.Hour}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{Inner: timeDurationInner, Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationInner = &TimeDurationInner{time.Hour}
-	timeDurationTest = &TimeDurationTest{timeDurationInner, time.Hour}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour}
+	timeDurationTest = &TimeDurationTest{Inner: timeDurationInner, Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "necsfield")
@@ -1776,8 +1774,8 @@ func TestCrossStructNeFieldValidation(t *testing.T) {
 	}
 	var timeDurationOmitemptyTest *TimeDurationOmitemptyTest
 
-	timeDurationInner = &TimeDurationInner{time.Duration(0)}
-	timeDurationOmitemptyTest = &TimeDurationOmitemptyTest{timeDurationInner, time.Duration(0)}
+	timeDurationInner = &TimeDurationInner{Duration: time.Duration(0)}
+	timeDurationOmitemptyTest = &TimeDurationOmitemptyTest{Inner: timeDurationInner, Duration: time.Duration(0)}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 }
@@ -1923,19 +1921,19 @@ func TestCrossStructEqFieldValidation(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationInner = &TimeDurationInner{time.Hour}
-	timeDurationTest = &TimeDurationTest{timeDurationInner, time.Hour}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour}
+	timeDurationTest = &TimeDurationTest{Inner: timeDurationInner, Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationInner = &TimeDurationInner{time.Hour - time.Minute}
-	timeDurationTest = &TimeDurationTest{timeDurationInner, time.Hour}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{Inner: timeDurationInner, Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "eqcsfield")
 
-	timeDurationInner = &TimeDurationInner{time.Hour + time.Minute}
-	timeDurationTest = &TimeDurationTest{timeDurationInner, time.Hour}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{Inner: timeDurationInner, Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "eqcsfield")
@@ -1946,8 +1944,8 @@ func TestCrossStructEqFieldValidation(t *testing.T) {
 	}
 	var timeDurationOmitemptyTest *TimeDurationOmitemptyTest
 
-	timeDurationInner = &TimeDurationInner{time.Hour}
-	timeDurationOmitemptyTest = &TimeDurationOmitemptyTest{timeDurationInner, time.Duration(0)}
+	timeDurationInner = &TimeDurationInner{Duration: time.Hour}
+	timeDurationOmitemptyTest = &TimeDurationOmitemptyTest{Inner: timeDurationInner, Duration: time.Duration(0)}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 }
@@ -2324,19 +2322,18 @@ func TestMACValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"3D:F2:C9:A6:B3:4F", true},
-		{"3D-F2-C9-A6-B3:4F", false},
-		{"123", false},
-		{"", false},
-		{"abacaba", false},
-		{"00:25:96:FF:FE:12:34:56", true},
-		{"0025:96FF:FE12:3456", false},
+		{param: "3D:F2:C9:A6:B3:4F", expected: true},
+		{param: "3D-F2-C9-A6-B3:4F", expected: false},
+		{param: "123", expected: false},
+		{param: "", expected: false},
+		{param: "abacaba", expected: false},
+		{param: "00:25:96:FF:FE:12:34:56", expected: true},
+		{param: "0025:96FF:FE12:3456", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "mac")
 
 		if test.expected {
@@ -2361,23 +2358,22 @@ func TestIPValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"10.0.0.1", true},
-		{"172.16.0.1", true},
-		{"192.168.0.1", true},
-		{"192.168.255.254", true},
-		{"192.168.255.256", false},
-		{"172.16.255.254", true},
-		{"172.16.256.255", false},
-		{"2001:cdba:0000:0000:0000:0000:3257:9652", true},
-		{"2001:cdba:0:0:0:0:3257:9652", true},
-		{"2001:cdba::3257:9652", true},
+		{param: "", expected: false},
+		{param: "10.0.0.1", expected: true},
+		{param: "172.16.0.1", expected: true},
+		{param: "192.168.0.1", expected: true},
+		{param: "192.168.255.254", expected: true},
+		{param: "192.168.255.256", expected: false},
+		{param: "172.16.255.254", expected: true},
+		{param: "172.16.256.255", expected: false},
+		{param: "2001:cdba:0000:0000:0000:0000:3257:9652", expected: true},
+		{param: "2001:cdba:0:0:0:0:3257:9652", expected: true},
+		{param: "2001:cdba::3257:9652", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "ip")
 
 		if test.expected {
@@ -2402,22 +2398,21 @@ func TestIPv6Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"10.0.0.1", false},
-		{"172.16.0.1", false},
-		{"192.168.0.1", false},
-		{"192.168.255.254", false},
-		{"192.168.255.256", false},
-		{"172.16.255.254", false},
-		{"172.16.256.255", false},
-		{"2001:cdba:0000:0000:0000:0000:3257:9652", true},
-		{"2001:cdba:0:0:0:0:3257:9652", true},
-		{"2001:cdba::3257:9652", true},
+		{param: "10.0.0.1", expected: false},
+		{param: "172.16.0.1", expected: false},
+		{param: "192.168.0.1", expected: false},
+		{param: "192.168.255.254", expected: false},
+		{param: "192.168.255.256", expected: false},
+		{param: "172.16.255.254", expected: false},
+		{param: "172.16.256.255", expected: false},
+		{param: "2001:cdba:0000:0000:0000:0000:3257:9652", expected: true},
+		{param: "2001:cdba:0:0:0:0:3257:9652", expected: true},
+		{param: "2001:cdba::3257:9652", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "ipv6")
 
 		if test.expected {
@@ -2442,22 +2437,21 @@ func TestIPv4Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"10.0.0.1", true},
-		{"172.16.0.1", true},
-		{"192.168.0.1", true},
-		{"192.168.255.254", true},
-		{"192.168.255.256", false},
-		{"172.16.255.254", true},
-		{"172.16.256.255", false},
-		{"2001:cdba:0000:0000:0000:0000:3257:9652", false},
-		{"2001:cdba:0:0:0:0:3257:9652", false},
-		{"2001:cdba::3257:9652", false},
+		{param: "10.0.0.1", expected: true},
+		{param: "172.16.0.1", expected: true},
+		{param: "192.168.0.1", expected: true},
+		{param: "192.168.255.254", expected: true},
+		{param: "192.168.255.256", expected: false},
+		{param: "172.16.255.254", expected: true},
+		{param: "172.16.256.255", expected: false},
+		{param: "2001:cdba:0000:0000:0000:0000:3257:9652", expected: false},
+		{param: "2001:cdba:0:0:0:0:3257:9652", expected: false},
+		{param: "2001:cdba::3257:9652", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "ipv4")
 
 		if test.expected {
@@ -2482,25 +2476,24 @@ func TestCIDRValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"10.0.0.0/0", true},
-		{"10.0.0.1/8", true},
-		{"172.16.0.1/16", true},
-		{"192.168.0.1/24", true},
-		{"192.168.255.254/24", true},
-		{"192.168.255.254/48", false},
-		{"192.168.255.256/24", false},
-		{"172.16.255.254/16", true},
-		{"172.16.256.255/16", false},
-		{"2001:cdba:0000:0000:0000:0000:3257:9652/64", true},
-		{"2001:cdba:0000:0000:0000:0000:3257:9652/256", false},
-		{"2001:cdba:0:0:0:0:3257:9652/32", true},
-		{"2001:cdba::3257:9652/16", true},
+		{param: "10.0.0.0/0", expected: true},
+		{param: "10.0.0.1/8", expected: true},
+		{param: "172.16.0.1/16", expected: true},
+		{param: "192.168.0.1/24", expected: true},
+		{param: "192.168.255.254/24", expected: true},
+		{param: "192.168.255.254/48", expected: false},
+		{param: "192.168.255.256/24", expected: false},
+		{param: "172.16.255.254/16", expected: true},
+		{param: "172.16.256.255/16", expected: false},
+		{param: "2001:cdba:0000:0000:0000:0000:3257:9652/64", expected: true},
+		{param: "2001:cdba:0000:0000:0000:0000:3257:9652/256", expected: false},
+		{param: "2001:cdba:0:0:0:0:3257:9652/32", expected: true},
+		{param: "2001:cdba::3257:9652/16", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "cidr")
 
 		if test.expected {
@@ -2525,25 +2518,24 @@ func TestCIDRv6Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"10.0.0.0/0", false},
-		{"10.0.0.1/8", false},
-		{"172.16.0.1/16", false},
-		{"192.168.0.1/24", false},
-		{"192.168.255.254/24", false},
-		{"192.168.255.254/48", false},
-		{"192.168.255.256/24", false},
-		{"172.16.255.254/16", false},
-		{"172.16.256.255/16", false},
-		{"2001:cdba:0000:0000:0000:0000:3257:9652/64", true},
-		{"2001:cdba:0000:0000:0000:0000:3257:9652/256", false},
-		{"2001:cdba:0:0:0:0:3257:9652/32", true},
-		{"2001:cdba::3257:9652/16", true},
+		{param: "10.0.0.0/0", expected: false},
+		{param: "10.0.0.1/8", expected: false},
+		{param: "172.16.0.1/16", expected: false},
+		{param: "192.168.0.1/24", expected: false},
+		{param: "192.168.255.254/24", expected: false},
+		{param: "192.168.255.254/48", expected: false},
+		{param: "192.168.255.256/24", expected: false},
+		{param: "172.16.255.254/16", expected: false},
+		{param: "172.16.256.255/16", expected: false},
+		{param: "2001:cdba:0000:0000:0000:0000:3257:9652/64", expected: true},
+		{param: "2001:cdba:0000:0000:0000:0000:3257:9652/256", expected: false},
+		{param: "2001:cdba:0:0:0:0:3257:9652/32", expected: true},
+		{param: "2001:cdba::3257:9652/16", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "cidrv6")
 
 		if test.expected {
@@ -2568,25 +2560,24 @@ func TestCIDRv4Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"10.0.0.0/0", true},
-		{"10.0.0.1/8", true},
-		{"172.16.0.1/16", true},
-		{"192.168.0.1/24", true},
-		{"192.168.255.254/24", true},
-		{"192.168.255.254/48", false},
-		{"192.168.255.256/24", false},
-		{"172.16.255.254/16", true},
-		{"172.16.256.255/16", false},
-		{"2001:cdba:0000:0000:0000:0000:3257:9652/64", false},
-		{"2001:cdba:0000:0000:0000:0000:3257:9652/256", false},
-		{"2001:cdba:0:0:0:0:3257:9652/32", false},
-		{"2001:cdba::3257:9652/16", false},
+		{param: "10.0.0.0/0", expected: true},
+		{param: "10.0.0.1/8", expected: true},
+		{param: "172.16.0.1/16", expected: true},
+		{param: "192.168.0.1/24", expected: true},
+		{param: "192.168.255.254/24", expected: true},
+		{param: "192.168.255.254/48", expected: false},
+		{param: "192.168.255.256/24", expected: false},
+		{param: "172.16.255.254/16", expected: true},
+		{param: "172.16.256.255/16", expected: false},
+		{param: "2001:cdba:0000:0000:0000:0000:3257:9652/64", expected: false},
+		{param: "2001:cdba:0000:0000:0000:0000:3257:9652/256", expected: false},
+		{param: "2001:cdba:0:0:0:0:3257:9652/32", expected: false},
+		{param: "2001:cdba::3257:9652/16", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "cidrv4")
 
 		if test.expected {
@@ -2611,12 +2602,12 @@ func TestTCPAddrValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{":80", false},
-		{"127.0.0.1:80", true},
-		{"[::1]:80", true},
-		{"256.0.0.0:1", false},
-		{"[::1]", false},
+		{param: "", expected: false},
+		{param: ":80", expected: false},
+		{param: "127.0.0.1:80", expected: true},
+		{param: "[::1]:80", expected: true},
+		{param: "256.0.0.0:1", expected: false},
+		{param: "[::1]", expected: false},
 	}
 
 	validate := New()
@@ -2645,12 +2636,12 @@ func TestTCP6AddrValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{":80", false},
-		{"127.0.0.1:80", false},
-		{"[::1]:80", true},
-		{"256.0.0.0:1", false},
-		{"[::1]", false},
+		{param: "", expected: false},
+		{param: ":80", expected: false},
+		{param: "127.0.0.1:80", expected: false},
+		{param: "[::1]:80", expected: true},
+		{param: "256.0.0.0:1", expected: false},
+		{param: "[::1]", expected: false},
 	}
 
 	validate := New()
@@ -2679,12 +2670,12 @@ func TestTCP4AddrValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{":80", false},
-		{"127.0.0.1:80", true},
-		{"[::1]:80", false}, // https://github.com/golang/go/issues/14037
-		{"256.0.0.0:1", false},
-		{"[::1]", false},
+		{param: "", expected: false},
+		{param: ":80", expected: false},
+		{param: "127.0.0.1:80", expected: true},
+		{param: "[::1]:80", expected: false}, // https://github.com/golang/go/issues/14037
+		{param: "256.0.0.0:1", expected: false},
+		{param: "[::1]", expected: false},
 	}
 
 	validate := New()
@@ -2714,12 +2705,12 @@ func TestUDPAddrValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{":80", false},
-		{"127.0.0.1:80", true},
-		{"[::1]:80", true},
-		{"256.0.0.0:1", false},
-		{"[::1]", false},
+		{param: "", expected: false},
+		{param: ":80", expected: false},
+		{param: "127.0.0.1:80", expected: true},
+		{param: "[::1]:80", expected: true},
+		{param: "256.0.0.0:1", expected: false},
+		{param: "[::1]", expected: false},
 	}
 
 	validate := New()
@@ -2748,12 +2739,12 @@ func TestUDP6AddrValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{":80", false},
-		{"127.0.0.1:80", false},
-		{"[::1]:80", true},
-		{"256.0.0.0:1", false},
-		{"[::1]", false},
+		{param: "", expected: false},
+		{param: ":80", expected: false},
+		{param: "127.0.0.1:80", expected: false},
+		{param: "[::1]:80", expected: true},
+		{param: "256.0.0.0:1", expected: false},
+		{param: "[::1]", expected: false},
 	}
 
 	validate := New()
@@ -2782,12 +2773,12 @@ func TestUDP4AddrValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{":80", false},
-		{"127.0.0.1:80", true},
-		{"[::1]:80", false}, // https://github.com/golang/go/issues/14037
-		{"256.0.0.0:1", false},
-		{"[::1]", false},
+		{param: "", expected: false},
+		{param: ":80", expected: false},
+		{param: "127.0.0.1:80", expected: true},
+		{param: "[::1]:80", expected: false}, // https://github.com/golang/go/issues/14037
+		{param: "256.0.0.0:1", expected: false},
+		{param: "[::1]", expected: false},
 	}
 
 	validate := New()
@@ -2817,12 +2808,12 @@ func TestIPAddrValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"127.0.0.1", true},
-		{"127.0.0.1:80", false},
-		{"::1", true},
-		{"256.0.0.0", false},
-		{"localhost", false},
+		{param: "", expected: false},
+		{param: "127.0.0.1", expected: true},
+		{param: "127.0.0.1:80", expected: false},
+		{param: "::1", expected: true},
+		{param: "256.0.0.0", expected: false},
+		{param: "localhost", expected: false},
 	}
 
 	validate := New()
@@ -2851,12 +2842,12 @@ func TestIP6AddrValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"127.0.0.1", false}, // https://github.com/golang/go/issues/14037
-		{"127.0.0.1:80", false},
-		{"::1", true},
-		{"0:0:0:0:0:0:0:1", true},
-		{"256.0.0.0", false},
+		{param: "", expected: false},
+		{param: "127.0.0.1", expected: false}, // https://github.com/golang/go/issues/14037
+		{param: "127.0.0.1:80", expected: false},
+		{param: "::1", expected: true},
+		{param: "0:0:0:0:0:0:0:1", expected: true},
+		{param: "256.0.0.0", expected: false},
 	}
 
 	validate := New()
@@ -2885,12 +2876,12 @@ func TestIP4AddrValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"127.0.0.1", true},
-		{"127.0.0.1:80", false},
-		{"::1", false}, // https://github.com/golang/go/issues/14037
-		{"256.0.0.0", false},
-		{"localhost", false},
+		{param: "", expected: false},
+		{param: "127.0.0.1", expected: true},
+		{param: "127.0.0.1:80", expected: false},
+		{param: "::1", expected: false}, // https://github.com/golang/go/issues/14037
+		{param: "256.0.0.0", expected: false},
+		{param: "localhost", expected: false},
 	}
 
 	validate := New()
@@ -2920,8 +2911,8 @@ func TestUnixAddrValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", true},
-		{"v.sock", true},
+		{param: "", expected: true},
+		{param: "v.sock", expected: true},
 	}
 
 	validate := New()
@@ -2996,7 +2987,7 @@ func TestSliceMapArrayChanFuncPtrInterfaceRequiredValidation(t *testing.T) {
 	errs = validate.Var(tst, "required")
 	Equal(t, errs, nil)
 
-	var iface interface{}
+	var iface any
 
 	errs = validate.Var(iface, "required")
 	NotEqual(t, errs, nil)
@@ -3075,8 +3066,8 @@ func TestBadKeyValidation(t *testing.T) {
 }
 
 func TestInterfaceErrValidation(t *testing.T) {
-	var v2 interface{} = 1
-	var v1 interface{} = v2
+	var v2 any = 1
+	var v1 any = v2
 
 	validate := New()
 	errs := validate.Var(v1, "len=1")
@@ -3086,9 +3077,9 @@ func TestInterfaceErrValidation(t *testing.T) {
 	Equal(t, errs, nil)
 
 	type ExternalCMD struct {
-		Userid string      `json:"userid"`
-		Action uint32      `json:"action"`
-		Data   interface{} `json:"data,omitempty" validate:"required"`
+		Userid string `json:"userid"`
+		Action uint32 `json:"action"`
+		Data   any    `json:"data,omitempty" validate:"required"`
 	}
 
 	s := &ExternalCMD{
@@ -3103,9 +3094,9 @@ func TestInterfaceErrValidation(t *testing.T) {
 	AssertError(t, errs, "ExternalCMD.Data", "ExternalCMD.Data", "Data", "Data", "required")
 
 	type ExternalCMD2 struct {
-		Userid string      `json:"userid"`
-		Action uint32      `json:"action"`
-		Data   interface{} `json:"data,omitempty" validate:"len=1"`
+		Userid string `json:"userid"`
+		Action uint32 `json:"action"`
+		Data   any    `json:"data,omitempty" validate:"len=1"`
 	}
 
 	s2 := &ExternalCMD2{
@@ -3150,10 +3141,10 @@ func TestInterfaceErrValidation(t *testing.T) {
 	AssertError(t, errs, "ExternalCMD.Data.Name", "ExternalCMD.Data.Name", "Name", "Name", "required")
 
 	type TestMapStructPtr struct {
-		Errs map[int]interface{} `validate:"gt=0,dive,len=2"`
+		Errs map[int]any `validate:"gt=0,dive,len=2"`
 	}
 
-	mip := map[int]interface{}{0: &Inner{"ok"}, 3: nil, 4: &Inner{"ok"}}
+	mip := map[int]any{0: &Inner{Name: "ok"}, 3: nil, 4: &Inner{Name: "ok"}}
 
 	msp := &TestMapStructPtr{
 		Errs: mip,
@@ -3165,13 +3156,13 @@ func TestInterfaceErrValidation(t *testing.T) {
 	AssertError(t, errs, "TestMapStructPtr.Errs[3]", "TestMapStructPtr.Errs[3]", "Errs[3]", "Errs[3]", "len")
 
 	type TestMultiDimensionalStructs struct {
-		Errs [][]interface{} `validate:"gt=0,dive,dive"`
+		Errs [][]any `validate:"gt=0,dive,dive"`
 	}
 
-	var errStructArray [][]interface{}
+	var errStructArray [][]any
 
-	errStructArray = append(errStructArray, []interface{}{&Inner{"ok"}, &Inner{""}, &Inner{""}})
-	errStructArray = append(errStructArray, []interface{}{&Inner{"ok"}, &Inner{""}, &Inner{""}})
+	errStructArray = append(errStructArray, []any{&Inner{Name: "ok"}, &Inner{Name: ""}, &Inner{Name: ""}})
+	errStructArray = append(errStructArray, []any{&Inner{Name: "ok"}, &Inner{Name: ""}, &Inner{Name: ""}})
 
 	tms := &TestMultiDimensionalStructs{
 		Errs: errStructArray,
@@ -3209,7 +3200,7 @@ func TestInterfaceErrValidation(t *testing.T) {
 	AssertError(t, errs, "TestMultiDimensionalStructsPtr2.Errs[2][1].Name", "TestMultiDimensionalStructsPtr2.Errs[2][1].Name", "Name", "Name", "required")
 	AssertError(t, errs, "TestMultiDimensionalStructsPtr2.Errs[2][2]", "TestMultiDimensionalStructsPtr2.Errs[2][2]", "Errs[2][2]", "Errs[2][2]", "required")
 
-	m := map[int]interface{}{0: "ok", 3: "", 4: "ok"}
+	m := map[int]any{0: "ok", 3: "", 4: "ok"}
 
 	errs = validate.Var(m, "len=3,dive,len=2")
 	NotEqual(t, errs, nil)
@@ -3221,7 +3212,7 @@ func TestInterfaceErrValidation(t *testing.T) {
 	Equal(t, len(errs.(ValidationErrors)), 1)
 	AssertError(t, errs, "", "", "", "", "len")
 
-	arr := []interface{}{"ok", "", "ok"}
+	arr := []any{"ok", "", "ok"}
 
 	errs = validate.Var(arr, "len=3,dive,len=2")
 	NotEqual(t, errs, nil)
@@ -3235,7 +3226,7 @@ func TestInterfaceErrValidation(t *testing.T) {
 
 	type MyStruct struct {
 		A, B string
-		C    interface{}
+		C    any
 	}
 
 	var a MyStruct
@@ -3250,7 +3241,7 @@ func TestInterfaceErrValidation(t *testing.T) {
 func TestMapDiveValidation(t *testing.T) {
 	validate := New()
 
-	n := map[int]interface{}{0: nil}
+	n := map[int]any{0: nil}
 	errs := validate.Var(n, "omitempty,required")
 	Equal(t, errs, nil)
 
@@ -3274,7 +3265,7 @@ func TestMapDiveValidation(t *testing.T) {
 		Errs map[int]Inner `validate:"gt=0,dive"`
 	}
 
-	mi := map[int]Inner{0: {"ok"}, 3: {""}, 4: {"ok"}}
+	mi := map[int]Inner{0: {Name: "ok"}, 3: {Name: ""}, 4: {Name: "ok"}}
 
 	ms := &TestMapStruct{
 		Errs: mi,
@@ -3290,10 +3281,10 @@ func TestMapDiveValidation(t *testing.T) {
 	NotEqual(t, s, "")
 
 	type TestMapInterface struct {
-		Errs map[int]interface{} `validate:"dive"`
+		Errs map[int]any `validate:"dive"`
 	}
 
-	mit := map[int]interface{}{0: Inner{"ok"}, 1: Inner{""}, 3: nil, 5: "string", 6: 33}
+	mit := map[int]any{0: Inner{Name: "ok"}, 1: Inner{Name: ""}, 3: nil, 5: "string", 6: 33}
 
 	msi := &TestMapInterface{
 		Errs: mit,
@@ -3462,8 +3453,8 @@ func TestArrayDiveValidation(t *testing.T) {
 
 	var errStructArray [][]Inner
 
-	errStructArray = append(errStructArray, []Inner{{"ok"}, {""}, {""}})
-	errStructArray = append(errStructArray, []Inner{{"ok"}, {""}, {""}})
+	errStructArray = append(errStructArray, []Inner{{Name: "ok"}, {Name: ""}, {Name: ""}})
+	errStructArray = append(errStructArray, []Inner{{Name: "ok"}, {Name: ""}, {Name: ""}})
 
 	tms := &TestMultiDimensionalStructs{
 		Errs: errStructArray,
@@ -3701,17 +3692,16 @@ func TestSSNValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"00-90-8787", false},
-		{"66690-76", false},
-		{"191 60 2869", true},
-		{"191-60-2869", true},
+		{param: "", expected: false},
+		{param: "00-90-8787", expected: false},
+		{param: "66690-76", expected: false},
+		{param: "191 60 2869", expected: true},
+		{param: "191-60-2869", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "ssn")
 
 		if test.expected {
@@ -3733,25 +3723,24 @@ func TestSSNValidation(t *testing.T) {
 
 func TestLongitudeValidation(t *testing.T) {
 	tests := []struct {
-		param    interface{}
+		param    any
 		expected bool
 	}{
-		{"", false},
-		{"-180.000", true},
-		{"180.1", false},
-		{"+73.234", true},
-		{"+382.3811", false},
-		{"23.11111111", true},
-		{uint(180), true},
-		{float32(-180.0), true},
-		{-180, true},
-		{180.1, false},
+		{param: "", expected: false},
+		{param: "-180.000", expected: true},
+		{param: "180.1", expected: false},
+		{param: "+73.234", expected: true},
+		{param: "+382.3811", expected: false},
+		{param: "23.11111111", expected: true},
+		{param: uint(180), expected: true},
+		{param: float32(-180.0), expected: true},
+		{param: -180, expected: true},
+		{param: 180.1, expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "longitude")
 
 		if test.expected {
@@ -3775,25 +3764,24 @@ func TestLongitudeValidation(t *testing.T) {
 
 func TestLatitudeValidation(t *testing.T) {
 	tests := []struct {
-		param    interface{}
+		param    any
 		expected bool
 	}{
-		{"", false},
-		{"-90.000", true},
-		{"+90", true},
-		{"47.1231231", true},
-		{"+99.9", false},
-		{"108", false},
-		{uint(90), true},
-		{float32(-90.0), true},
-		{-90, true},
-		{90.1, false},
+		{param: "", expected: false},
+		{param: "-90.000", expected: true},
+		{param: "+90", expected: true},
+		{param: "47.1231231", expected: true},
+		{param: "+99.9", expected: false},
+		{param: "108", expected: false},
+		{param: uint(90), expected: true},
+		{param: float32(-90.0), expected: true},
+		{param: -90, expected: true},
+		{param: 90.1, expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "latitude")
 
 		if test.expected {
@@ -3820,24 +3808,24 @@ func TestDataURIValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"data:image/png;base64,TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4=", true},
-		{"data:text/plain;base64,Vml2YW11cyBmZXJtZW50dW0gc2VtcGVyIHBvcnRhLg==", true},
-		{"image/gif;base64,U3VzcGVuZGlzc2UgbGVjdHVzIGxlbw==", false},
+		{param: "data:image/png;base64,TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4=", expected: true},
+		{param: "data:text/plain;base64,Vml2YW11cyBmZXJtZW50dW0gc2VtcGVyIHBvcnRhLg==", expected: true},
+		{param: "image/gif;base64,U3VzcGVuZGlzc2UgbGVjdHVzIGxlbw==", expected: false},
 		{
-			"data:image/gif;base64,MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuMPNS1Ufof9EW/M98FNw" +
+			param: "data:image/gif;base64,MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuMPNS1Ufof9EW/M98FNw" +
 				"UAKrwflsqVxaxQjBQnHQmiI7Vac40t8x7pIb8gLGV6wL7sBTJiPovJ0V7y7oc0Ye" +
 				"rhKh0Rm4skP2z/jHwwZICgGzBvA0rH8xlhUiTvcwDCJ0kc+fh35hNt8srZQM4619" +
 				"FTgB66Xmp4EtVyhpQV+t02g6NzK72oZI0vnAvqhpkxLeLiMCyrI416wHm5Tkukhx" +
 				"QmcL2a6hNOyu0ixX/x2kSFXApEnVrJ+/IxGyfyw8kf4N2IZpW5nEP847lpfj0SZZ" +
-				"Fwrd1mnfnDbYohX2zRptLy2ZUn06Qo9pkG5ntvFEPo9bfZeULtjYzIl6K8gJ2uGZ" + "HQIDAQAB", true,
+				"Fwrd1mnfnDbYohX2zRptLy2ZUn06Qo9pkG5ntvFEPo9bfZeULtjYzIl6K8gJ2uGZ" + "HQIDAQAB", expected: true,
 		},
-		{"data:image/png;base64,12345", false},
-		{"", false},
-		{"data:text,:;base85,U3VzcGVuZGlzc2UgbGVjdHVzIGxlbw==", false},
-		{"data:image/jpeg;key=value;base64,UEsDBBQAAAAI", true},
-		{"data:image/jpeg;key=value,UEsDBBQAAAAI", true},
-		{"data:;base64;sdfgsdfgsdfasdfa=s,UEsDBBQAAAAI", true},
-		{"data:,UEsDBBQAAAAI", true},
+		{param: "data:image/png;base64,12345", expected: false},
+		{param: "", expected: false},
+		{param: "data:text,:;base85,U3VzcGVuZGlzc2UgbGVjdHVzIGxlbw==", expected: false},
+		{param: "data:image/jpeg;key=value;base64,UEsDBBQAAAAI", expected: true},
+		{param: "data:image/jpeg;key=value,UEsDBBQAAAAI", expected: true},
+		{param: "data:;base64;sdfgsdfgsdfasdfa=s,UEsDBBQAAAAI", expected: true},
+		{param: "data:,UEsDBBQAAAAI", expected: true},
 	}
 
 	validate := New()
@@ -3867,22 +3855,21 @@ func TestMultibyteValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", true},
-		{"abc", false},
-		{"123", false},
-		{"<>@;.-=", false},
-		{"ひらがな・カタカナ、．漢字", true},
-		{"あいうえお foobar", true},
-		{"test＠example.com", true},
-		{"test＠example.com", true},
-		{"1234abcDEｘｙｚ", true},
-		{"ｶﾀｶﾅ", true},
+		{param: "", expected: true},
+		{param: "abc", expected: false},
+		{param: "123", expected: false},
+		{param: "<>@;.-=", expected: false},
+		{param: "ひらがな・カタカナ、．漢字", expected: true},
+		{param: "あいうえお foobar", expected: true},
+		{param: "test＠example.com", expected: true},
+		{param: "test＠example.com", expected: true},
+		{param: "1234abcDEｘｙｚ", expected: true},
+		{param: "ｶﾀｶﾅ", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "multibyte")
 
 		if test.expected {
@@ -3907,23 +3894,22 @@ func TestPrintableASCIIValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", true},
-		{"ｆｏｏbar", false},
-		{"ｘｙｚ０９８", false},
-		{"１２３456", false},
-		{"ｶﾀｶﾅ", false},
-		{"foobar", true},
-		{"0987654321", true},
-		{"test@example.com", true},
-		{"1234abcDEF", true},
-		{"newline\n", false},
-		{"\x19test\x7F", false},
+		{param: "", expected: true},
+		{param: "ｆｏｏbar", expected: false},
+		{param: "ｘｙｚ０９８", expected: false},
+		{param: "１２３456", expected: false},
+		{param: "ｶﾀｶﾅ", expected: false},
+		{param: "foobar", expected: true},
+		{param: "0987654321", expected: true},
+		{param: "test@example.com", expected: true},
+		{param: "1234abcDEF", expected: true},
+		{param: "newline\n", expected: false},
+		{param: "\x19test\x7F", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "printascii")
 
 		if test.expected {
@@ -3948,22 +3934,21 @@ func TestASCIIValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", true},
-		{"ｆｏｏbar", false},
-		{"ｘｙｚ０９８", false},
-		{"１２３456", false},
-		{"ｶﾀｶﾅ", false},
-		{"foobar", true},
-		{"0987654321", true},
-		{"test@example.com", true},
-		{"1234abcDEF", true},
-		{"", true},
+		{param: "", expected: true},
+		{param: "ｆｏｏbar", expected: false},
+		{param: "ｘｙｚ０９８", expected: false},
+		{param: "１２３456", expected: false},
+		{param: "ｶﾀｶﾅ", expected: false},
+		{param: "foobar", expected: true},
+		{param: "0987654321", expected: true},
+		{param: "test@example.com", expected: true},
+		{param: "1234abcDEF", expected: true},
+		{param: "", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "ascii")
 
 		if test.expected {
@@ -3988,19 +3973,17 @@ func TestUUID5Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-
-		{"", false},
-		{"xxxa987fbc9-4bed-3078-cf07-9141ba07c9f3", false},
-		{"9c858901-8a57-4791-81fe-4c455b099bc9", false},
-		{"a987fbc9-4bed-3078-cf07-9141ba07c9f3", false},
-		{"987fbc97-4bed-5078-af07-9141ba07c9f3", true},
-		{"987fbc97-4bed-5078-9f07-9141ba07c9f3", true},
+		{param: "", expected: false},
+		{param: "xxxa987fbc9-4bed-3078-cf07-9141ba07c9f3", expected: false},
+		{param: "9c858901-8a57-4791-81fe-4c455b099bc9", expected: false},
+		{param: "a987fbc9-4bed-3078-cf07-9141ba07c9f3", expected: false},
+		{param: "987fbc97-4bed-5078-af07-9141ba07c9f3", expected: true},
+		{param: "987fbc97-4bed-5078-9f07-9141ba07c9f3", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "uuid5")
 
 		if test.expected {
@@ -4025,18 +4008,17 @@ func TestUUID4Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"xxxa987fbc9-4bed-3078-cf07-9141ba07c9f3", false},
-		{"a987fbc9-4bed-5078-af07-9141ba07c9f3", false},
-		{"934859", false},
-		{"57b73598-8764-4ad0-a76a-679bb6640eb1", true},
-		{"625e63f3-58f5-40b7-83a1-a72ad31acffb", true},
+		{param: "", expected: false},
+		{param: "xxxa987fbc9-4bed-3078-cf07-9141ba07c9f3", expected: false},
+		{param: "a987fbc9-4bed-5078-af07-9141ba07c9f3", expected: false},
+		{param: "934859", expected: false},
+		{param: "57b73598-8764-4ad0-a76a-679bb6640eb1", expected: true},
+		{param: "625e63f3-58f5-40b7-83a1-a72ad31acffb", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "uuid4")
 
 		if test.expected {
@@ -4061,17 +4043,16 @@ func TestUUID3Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"412452646", false},
-		{"xxxa987fbc9-4bed-3078-cf07-9141ba07c9f3", false},
-		{"a987fbc9-4bed-4078-8f07-9141ba07c9f3", false},
-		{"a987fbc9-4bed-3078-cf07-9141ba07c9f3", true},
+		{param: "", expected: false},
+		{param: "412452646", expected: false},
+		{param: "xxxa987fbc9-4bed-3078-cf07-9141ba07c9f3", expected: false},
+		{param: "a987fbc9-4bed-4078-8f07-9141ba07c9f3", expected: false},
+		{param: "a987fbc9-4bed-3078-cf07-9141ba07c9f3", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "uuid3")
 
 		if test.expected {
@@ -4096,20 +4077,19 @@ func TestUUIDValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"xxxa987fbc9-4bed-3078-cf07-9141ba07c9f3", false},
-		{"a987fbc9-4bed-3078-cf07-9141ba07c9f3xxx", false},
-		{"a987fbc94bed3078cf079141ba07c9f3", false},
-		{"934859", false},
-		{"987fbc9-4bed-3078-cf07a-9141ba07c9f3", false},
-		{"aaaaaaaa-1111-1111-aaag-111111111111", false},
-		{"a987fbc9-4bed-3078-cf07-9141ba07c9f3", true},
+		{param: "", expected: false},
+		{param: "xxxa987fbc9-4bed-3078-cf07-9141ba07c9f3", expected: false},
+		{param: "a987fbc9-4bed-3078-cf07-9141ba07c9f3xxx", expected: false},
+		{param: "a987fbc94bed3078cf079141ba07c9f3", expected: false},
+		{param: "934859", expected: false},
+		{param: "987fbc9-4bed-3078-cf07a-9141ba07c9f3", expected: false},
+		{param: "aaaaaaaa-1111-1111-aaag-111111111111", expected: false},
+		{param: "a987fbc9-4bed-3078-cf07-9141ba07c9f3", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "uuid")
 
 		if test.expected {
@@ -4134,19 +4114,17 @@ func TestUUID5RFC4122Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-
-		{"", false},
-		{"xxxa987Fbc9-4bed-3078-cf07-9141ba07c9f3", false},
-		{"9c858901-8a57-4791-81Fe-4c455b099bc9", false},
-		{"a987Fbc9-4bed-3078-cf07-9141ba07c9f3", false},
-		{"987Fbc97-4bed-5078-af07-9141ba07c9f3", true},
-		{"987Fbc97-4bed-5078-9f07-9141ba07c9f3", true},
+		{param: "", expected: false},
+		{param: "xxxa987Fbc9-4bed-3078-cf07-9141ba07c9f3", expected: false},
+		{param: "9c858901-8a57-4791-81Fe-4c455b099bc9", expected: false},
+		{param: "a987Fbc9-4bed-3078-cf07-9141ba07c9f3", expected: false},
+		{param: "987Fbc97-4bed-5078-af07-9141ba07c9f3", expected: true},
+		{param: "987Fbc97-4bed-5078-9f07-9141ba07c9f3", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "uuid5_rfc4122")
 
 		if test.expected {
@@ -4171,18 +4149,17 @@ func TestUUID4RFC4122Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"xxxa987fbc9-4bed-3078-cf07-9141ba07c9F3", false},
-		{"a987fbc9-4bed-5078-af07-9141ba07c9F3", false},
-		{"934859", false},
-		{"57b73598-8764-4ad0-a76A-679bb6640eb1", true},
-		{"625e63f3-58f5-40b7-83a1-a72ad31acFfb", true},
+		{param: "", expected: false},
+		{param: "xxxa987fbc9-4bed-3078-cf07-9141ba07c9F3", expected: false},
+		{param: "a987fbc9-4bed-5078-af07-9141ba07c9F3", expected: false},
+		{param: "934859", expected: false},
+		{param: "57b73598-8764-4ad0-a76A-679bb6640eb1", expected: true},
+		{param: "625e63f3-58f5-40b7-83a1-a72ad31acFfb", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "uuid4_rfc4122")
 
 		if test.expected {
@@ -4207,17 +4184,16 @@ func TestUUID3RFC4122Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"412452646", false},
-		{"xxxa987fbc9-4bed-3078-cf07-9141ba07c9F3", false},
-		{"a987fbc9-4bed-4078-8f07-9141ba07c9F3", false},
-		{"a987fbc9-4bed-3078-cf07-9141ba07c9F3", true},
+		{param: "", expected: false},
+		{param: "412452646", expected: false},
+		{param: "xxxa987fbc9-4bed-3078-cf07-9141ba07c9F3", expected: false},
+		{param: "a987fbc9-4bed-4078-8f07-9141ba07c9F3", expected: false},
+		{param: "a987fbc9-4bed-3078-cf07-9141ba07c9F3", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "uuid3_rfc4122")
 
 		if test.expected {
@@ -4242,20 +4218,19 @@ func TestUUIDRFC4122Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"xxxa987Fbc9-4bed-3078-cf07-9141ba07c9f3", false},
-		{"a987Fbc9-4bed-3078-cf07-9141ba07c9f3xxx", false},
-		{"a987Fbc94bed3078cf079141ba07c9f3", false},
-		{"934859", false},
-		{"987fbc9-4bed-3078-cf07a-9141ba07c9F3", false},
-		{"aaaaaaaa-1111-1111-aaaG-111111111111", false},
-		{"a987Fbc9-4bed-3078-cf07-9141ba07c9f3", true},
+		{param: "", expected: false},
+		{param: "xxxa987Fbc9-4bed-3078-cf07-9141ba07c9f3", expected: false},
+		{param: "a987Fbc9-4bed-3078-cf07-9141ba07c9f3xxx", expected: false},
+		{param: "a987Fbc94bed3078cf079141ba07c9f3", expected: false},
+		{param: "934859", expected: false},
+		{param: "987fbc9-4bed-3078-cf07a-9141ba07c9F3", expected: false},
+		{param: "aaaaaaaa-1111-1111-aaaG-111111111111", expected: false},
+		{param: "a987Fbc9-4bed-3078-cf07-9141ba07c9f3", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "uuid_rfc4122")
 
 		if test.expected {
@@ -4280,22 +4255,21 @@ func TestULIDValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"01BX5ZZKBKACT-V9WEVGEMMVRZ", false},
-		{"01bx5zzkbkactav9wevgemmvrz", false},
-		{"a987Fbc9-4bed-3078-cf07-9141ba07c9f3xxx", false},
-		{"01BX5ZZKBKACTAV9WEVGEMMVRZABC", false},
-		{"01BX5ZZKBKACTAV9WEVGEMMVRZABC", false},
-		{"0IBX5ZZKBKACTAV9WEVGEMMVRZ", false},
-		{"O1BX5ZZKBKACTAV9WEVGEMMVRZ", false},
-		{"01BX5ZZKBKACTAVLWEVGEMMVRZ", false},
-		{"01BX5ZZKBKACTAV9WEVGEMMVRZ", true},
+		{param: "", expected: false},
+		{param: "01BX5ZZKBKACT-V9WEVGEMMVRZ", expected: false},
+		{param: "01bx5zzkbkactav9wevgemmvrz", expected: false},
+		{param: "a987Fbc9-4bed-3078-cf07-9141ba07c9f3xxx", expected: false},
+		{param: "01BX5ZZKBKACTAV9WEVGEMMVRZABC", expected: false},
+		{param: "01BX5ZZKBKACTAV9WEVGEMMVRZABC", expected: false},
+		{param: "0IBX5ZZKBKACTAV9WEVGEMMVRZ", expected: false},
+		{param: "O1BX5ZZKBKACTAV9WEVGEMMVRZ", expected: false},
+		{param: "01BX5ZZKBKACTAVLWEVGEMMVRZ", expected: false},
+		{param: "01BX5ZZKBKACTAV9WEVGEMMVRZ", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "ulid")
 
 		if test.expected {
@@ -4320,18 +4294,17 @@ func TestMD4Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"6f5902ac237024bdd0c176cb93063dc4", true},
-		{"6f5902ac237024bdd0c176cb93063dc-", false},
-		{"6f5902ac237024bdd0c176cb93063dc41", false},
-		{"6f5902ac237024bdd0c176cb93063dcC", false},
-		{"6f5902ac237024bdd0c176cb93063dc", false},
+		{param: "", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc4", expected: true},
+		{param: "6f5902ac237024bdd0c176cb93063dc-", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc41", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dcC", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "md4")
 
 		if test.expected {
@@ -4356,18 +4329,17 @@ func TestMD5Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"6f5902ac237024bdd0c176cb93063dc4", true},
-		{"6f5902ac237024bdd0c176cb93063dc-", false},
-		{"6f5902ac237024bdd0c176cb93063dc41", false},
-		{"6f5902ac237024bdd0c176cb93063dcC", false},
-		{"6f5902ac237024bdd0c176cb93063dc", false},
+		{param: "", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc4", expected: true},
+		{param: "6f5902ac237024bdd0c176cb93063dc-", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc41", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dcC", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "md5")
 
 		if test.expected {
@@ -4392,18 +4364,17 @@ func TestSHA256Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc4", true},
-		{"6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc-", false},
-		{"6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc41", false},
-		{"6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dcC", false},
-		{"6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc", false},
+		{param: "", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc4", expected: true},
+		{param: "6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc-", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc41", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dcC", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "sha256")
 		if test.expected {
 			if !IsEqual(errs, nil) {
@@ -4427,18 +4398,17 @@ func TestSHA384Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc4", true},
-		{"6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc-", false},
-		{"6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc41", false},
-		{"6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dcC", false},
-		{"6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc", false},
+		{param: "", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc4", expected: true},
+		{param: "6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc-", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc41", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dcC", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "sha384")
 
 		if test.expected {
@@ -4463,18 +4433,17 @@ func TestSHA512Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc4", true},
-		{"6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc-", false},
-		{"6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc41", false},
-		{"6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dcC", false},
-		{"6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc", false},
+		{param: "", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc4", expected: true},
+		{param: "6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc-", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc41", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dcC", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc46f5902ac237024bdd0c176cb93063dc", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "sha512")
 
 		if test.expected {
@@ -4499,18 +4468,17 @@ func TestRIPEMD128Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"6f5902ac237024bdd0c176cb93063dc4", true},
-		{"6f5902ac237024bdd0c176cb93063dc-", false},
-		{"6f5902ac237024bdd0c176cb93063dc41", false},
-		{"6f5902ac237024bdd0c176cb93063dcC", false},
-		{"6f5902ac237024bdd0c176cb93063dc", false},
+		{param: "", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc4", expected: true},
+		{param: "6f5902ac237024bdd0c176cb93063dc-", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc41", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dcC", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "ripemd128")
 
 		if test.expected {
@@ -4535,18 +4503,17 @@ func TestRIPEMD160Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"6f5902ac6f5902ac237024bdd0c176cb93063dc4", true},
-		{"6f5902ac6f5902ac237024bdd0c176cb93063dc-", false},
-		{"6f5902ac6f5902ac237024bdd0c176cb93063dc41", false},
-		{"6f5902ac6f5902ac237024bdd0c176cb93063dcC", false},
-		{"6f5902ac6f5902ac237024bdd0c176cb93063dc", false},
+		{param: "", expected: false},
+		{param: "6f5902ac6f5902ac237024bdd0c176cb93063dc4", expected: true},
+		{param: "6f5902ac6f5902ac237024bdd0c176cb93063dc-", expected: false},
+		{param: "6f5902ac6f5902ac237024bdd0c176cb93063dc41", expected: false},
+		{param: "6f5902ac6f5902ac237024bdd0c176cb93063dcC", expected: false},
+		{param: "6f5902ac6f5902ac237024bdd0c176cb93063dc", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "ripemd160")
 
 		if test.expected {
@@ -4571,18 +4538,17 @@ func TestTIGER128Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"6f5902ac237024bdd0c176cb93063dc4", true},
-		{"6f5902ac237024bdd0c176cb93063dc-", false},
-		{"6f5902ac237024bdd0c176cb93063dc41", false},
-		{"6f5902ac237024bdd0c176cb93063dcC", false},
-		{"6f5902ac237024bdd0c176cb93063dc", false},
+		{param: "", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc4", expected: true},
+		{param: "6f5902ac237024bdd0c176cb93063dc-", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc41", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dcC", expected: false},
+		{param: "6f5902ac237024bdd0c176cb93063dc", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "tiger128")
 
 		if test.expected {
@@ -4607,18 +4573,17 @@ func TestTIGER160Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"6f5902ac6f5902ac237024bdd0c176cb93063dc4", true},
-		{"6f5902ac6f5902ac237024bdd0c176cb93063dc-", false},
-		{"6f5902ac6f5902ac237024bdd0c176cb93063dc41", false},
-		{"6f5902ac6f5902ac237024bdd0c176cb93063dcC", false},
-		{"6f5902ac6f5902ac237024bdd0c176cb93063dc", false},
+		{param: "", expected: false},
+		{param: "6f5902ac6f5902ac237024bdd0c176cb93063dc4", expected: true},
+		{param: "6f5902ac6f5902ac237024bdd0c176cb93063dc-", expected: false},
+		{param: "6f5902ac6f5902ac237024bdd0c176cb93063dc41", expected: false},
+		{param: "6f5902ac6f5902ac237024bdd0c176cb93063dcC", expected: false},
+		{param: "6f5902ac6f5902ac237024bdd0c176cb93063dc", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "tiger160")
 
 		if test.expected {
@@ -4643,18 +4608,17 @@ func TestTIGER192Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"6f5902ac237024bd6f5902ac237024bdd0c176cb93063dc4", true},
-		{"6f5902ac237024bd6f5902ac237024bdd0c176cb93063dc-", false},
-		{"6f5902ac237024bd6f5902ac237024bdd0c176cb93063dc41", false},
-		{"6f5902ac237024bd6f5902ac237024bdd0c176cb93063dcC", false},
-		{"6f5902ac237024bd6f5902ac237024bdd0c176cb93063dc", false},
+		{param: "", expected: false},
+		{param: "6f5902ac237024bd6f5902ac237024bdd0c176cb93063dc4", expected: true},
+		{param: "6f5902ac237024bd6f5902ac237024bdd0c176cb93063dc-", expected: false},
+		{param: "6f5902ac237024bd6f5902ac237024bdd0c176cb93063dc41", expected: false},
+		{param: "6f5902ac237024bd6f5902ac237024bdd0c176cb93063dcC", expected: false},
+		{param: "6f5902ac237024bd6f5902ac237024bdd0c176cb93063dc", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "tiger192")
 
 		if test.expected {
@@ -4679,22 +4643,21 @@ func TestISBNValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"foo", false},
-		{"3836221195", true},
-		{"1-61729-085-8", true},
-		{"3 423 21412 0", true},
-		{"3 401 01319 X", true},
-		{"9784873113685", true},
-		{"978-4-87311-368-5", true},
-		{"978 3401013190", true},
-		{"978-3-8362-2119-1", true},
+		{param: "", expected: false},
+		{param: "foo", expected: false},
+		{param: "3836221195", expected: true},
+		{param: "1-61729-085-8", expected: true},
+		{param: "3 423 21412 0", expected: true},
+		{param: "3 401 01319 X", expected: true},
+		{param: "9784873113685", expected: true},
+		{param: "978-4-87311-368-5", expected: true},
+		{param: "978 3401013190", expected: true},
+		{param: "978-3-8362-2119-1", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "isbn")
 
 		if test.expected {
@@ -4719,21 +4682,20 @@ func TestISBN13Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"foo", false},
-		{"3-8362-2119-5", false},
-		{"01234567890ab", false},
-		{"978 3 8362 2119 0", false},
-		{"9784873113685", true},
-		{"978-4-87311-368-5", true},
-		{"978 3401013190", true},
-		{"978-3-8362-2119-1", true},
+		{param: "", expected: false},
+		{param: "foo", expected: false},
+		{param: "3-8362-2119-5", expected: false},
+		{param: "01234567890ab", expected: false},
+		{param: "978 3 8362 2119 0", expected: false},
+		{param: "9784873113685", expected: true},
+		{param: "978-4-87311-368-5", expected: true},
+		{param: "978 3401013190", expected: true},
+		{param: "978-3-8362-2119-1", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "isbn13")
 
 		if test.expected {
@@ -4758,22 +4720,21 @@ func TestISBN10Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"foo", false},
-		{"3423214121", false},
-		{"978-3836221191", false},
-		{"3-423-21412-1", false},
-		{"3 423 21412 1", false},
-		{"3836221195", true},
-		{"1-61729-085-8", true},
-		{"3 423 21412 0", true},
-		{"3 401 01319 X", true},
+		{param: "", expected: false},
+		{param: "foo", expected: false},
+		{param: "3423214121", expected: false},
+		{param: "978-3836221191", expected: false},
+		{param: "3-423-21412-1", expected: false},
+		{param: "3 423 21412 1", expected: false},
+		{param: "3836221195", expected: true},
+		{param: "1-61729-085-8", expected: true},
+		{param: "3 423 21412 0", expected: true},
+		{param: "3 401 01319 X", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "isbn10")
 
 		if test.expected {
@@ -5110,15 +5071,15 @@ func TestIsNeFieldValidation(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationTest = &TimeDurationTest{time.Hour, time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{First: time.Hour, Second: time.Hour - time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour, time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{First: time.Hour, Second: time.Hour + time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour, time.Hour}
+	timeDurationTest = &TimeDurationTest{First: time.Hour, Second: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.First", "TimeDurationTest.First", "First", "First", "nefield")
@@ -5128,7 +5089,7 @@ func TestIsNeFieldValidation(t *testing.T) {
 		Second time.Duration
 	}
 
-	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{time.Duration(0), time.Duration(0)}
+	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{First: time.Duration(0), Second: time.Duration(0)}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 }
@@ -5191,15 +5152,15 @@ func TestIsNeValidation(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationTest = &TimeDurationTest{time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour - time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour + time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "ne")
@@ -5208,7 +5169,7 @@ func TestIsNeValidation(t *testing.T) {
 		Duration time.Duration `validate:"omitempty,ne=0"`
 	}
 
-	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{time.Duration(0)}
+	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{Duration: time.Duration(0)}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 }
@@ -5380,16 +5341,16 @@ func TestIsEqFieldValidation(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationTest = &TimeDurationTest{time.Hour, time.Hour}
+	timeDurationTest = &TimeDurationTest{First: time.Hour, Second: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour, time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{First: time.Hour, Second: time.Hour - time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.First", "TimeDurationTest.First", "First", "First", "eqfield")
 
-	timeDurationTest = &TimeDurationTest{time.Hour, time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{First: time.Hour, Second: time.Hour + time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.First", "TimeDurationTest.First", "First", "First", "eqfield")
@@ -5399,7 +5360,7 @@ func TestIsEqFieldValidation(t *testing.T) {
 		Second time.Duration
 	}
 
-	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{time.Duration(0), time.Hour}
+	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{First: time.Duration(0), Second: time.Hour}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 }
@@ -5485,16 +5446,16 @@ func TestIsEqValidation(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationTest = &TimeDurationTest{time.Hour}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour - time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "eq")
 
-	timeDurationTest = &TimeDurationTest{time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour + time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "eq")
@@ -5503,7 +5464,7 @@ func TestIsEqValidation(t *testing.T) {
 		Duration time.Duration `validate:"omitempty,eq=1h"`
 	}
 
-	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{time.Duration(0)}
+	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{Duration: time.Duration(0)}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 }
@@ -5529,7 +5490,7 @@ func TestOneOfValidation(t *testing.T) {
 	validate := New()
 
 	passSpecs := []struct {
-		f interface{}
+		f any
 		t string
 	}{
 		{f: "red", t: "oneof=red green"},
@@ -5556,7 +5517,7 @@ func TestOneOfValidation(t *testing.T) {
 	}
 
 	failSpecs := []struct {
-		f interface{}
+		f any
 		t string
 	}{
 		{f: "", t: "oneof=red green"},
@@ -5619,25 +5580,25 @@ func TestBase64URLValidation(t *testing.T) {
 		success          bool
 	}{
 		// empty string, although a valid base64 string, should fail
-		{"", "", false},
+		{decoded: "", encoded: "", success: false},
 		// invalid length
-		{"", "a", false},
+		{decoded: "", encoded: "a", success: false},
 		// base64 with padding
-		{"f", "Zg==", true},
-		{"fo", "Zm8=", true},
+		{decoded: "f", encoded: "Zg==", success: true},
+		{decoded: "fo", encoded: "Zm8=", success: true},
 		// base64 without padding
-		{"foo", "Zm9v", true},
-		{"", "Zg", false},
-		{"", "Zm8", false},
+		{decoded: "foo", encoded: "Zm9v", success: true},
+		{decoded: "", encoded: "Zg", success: false},
+		{decoded: "", encoded: "Zm8", success: false},
 		// base64 URL safe encoding with invalid, special characters '+' and '/'
-		{"\x14\xfb\x9c\x03\xd9\x7e", "FPucA9l+", false},
-		{"\x14\xfb\x9c\x03\xf9\x73", "FPucA/lz", false},
+		{decoded: "\x14\xfb\x9c\x03\xd9\x7e", encoded: "FPucA9l+", success: false},
+		{decoded: "\x14\xfb\x9c\x03\xf9\x73", encoded: "FPucA/lz", success: false},
 		// base64 URL safe encoding with valid, special characters '-' and '_'
-		{"\x14\xfb\x9c\x03\xd9\x7e", "FPucA9l-", true},
-		{"\x14\xfb\x9c\x03\xf9\x73", "FPucA_lz", true},
+		{decoded: "\x14\xfb\x9c\x03\xd9\x7e", encoded: "FPucA9l-", success: true},
+		{decoded: "\x14\xfb\x9c\x03\xf9\x73", encoded: "FPucA_lz", success: true},
 		// non base64 characters
-		{"", "@mc=", false},
-		{"", "Zm 9", false},
+		{decoded: "", encoded: "@mc=", success: false},
+		{decoded: "", encoded: "Zm 9", success: false},
 	}
 	for _, tc := range testCases {
 		err := validate.Var(tc.encoded, "base64url")
@@ -5666,25 +5627,25 @@ func TestBase64RawURLValidation(t *testing.T) {
 		success          bool
 	}{
 		// empty string, although a valid base64 string, should fail
-		{"", "", false},
+		{decoded: "", encoded: "", success: false},
 		// invalid length
-		{"", "a", false},
+		{decoded: "", encoded: "a", success: false},
 		// base64 with padding should fail
-		{"f", "Zg==", false},
-		{"fo", "Zm8=", false},
+		{decoded: "f", encoded: "Zg==", success: false},
+		{decoded: "fo", encoded: "Zm8=", success: false},
 		// base64 without padding
-		{"foo", "Zm9v", true},
-		{"hello", "aGVsbG8", true},
-		{"", "aGVsb", false},
+		{decoded: "foo", encoded: "Zm9v", success: true},
+		{decoded: "hello", encoded: "aGVsbG8", success: true},
+		{decoded: "", encoded: "aGVsb", success: false},
 		// // base64 URL safe encoding with invalid, special characters '+' and '/'
-		{"\x14\xfb\x9c\x03\xd9\x7e", "FPucA9l+", false},
-		{"\x14\xfb\x9c\x03\xf9\x73", "FPucA/lz", false},
+		{decoded: "\x14\xfb\x9c\x03\xd9\x7e", encoded: "FPucA9l+", success: false},
+		{decoded: "\x14\xfb\x9c\x03\xf9\x73", encoded: "FPucA/lz", success: false},
 		// // base64 URL safe encoding with valid, special characters '-' and '_'
-		{"\x14\xfb\x9c\x03\xd9\x7e", "FPucA9l-", true},
-		{"\x14\xfb\x9c\x03\xf9\x73", "FPucA_lz", true},
+		{decoded: "\x14\xfb\x9c\x03\xd9\x7e", encoded: "FPucA9l-", success: true},
+		{decoded: "\x14\xfb\x9c\x03\xf9\x73", encoded: "FPucA_lz", success: true},
 		// non base64 characters
-		{"", "@mc=", false},
-		{"", "Zm 9", false},
+		{decoded: "", encoded: "@mc=", success: false},
+		{decoded: "", encoded: "Zm 9", success: false},
 	}
 	for _, tc := range testCases {
 		err := validate.Var(tc.encoded, "base64rawurl")
@@ -5713,10 +5674,10 @@ func TestFileValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"empty path", "", false},
-		{"regular file", filepath.Join("testdata", "a.go"), true},
-		{"missing file", filepath.Join("testdata", "no.go"), false},
-		{"directory, not a file", "testdata", false},
+		{title: "empty path", param: "", expected: false},
+		{title: "regular file", param: filepath.Join("testdata", "a.go"), expected: true},
+		{title: "missing file", param: filepath.Join("testdata", "no.go"), expected: false},
+		{title: "directory, not a file", param: "testdata", expected: false},
 	}
 
 	for _, test := range tests {
@@ -5758,46 +5719,46 @@ func TestImageValidation(t *testing.T) {
 		destroyImage func()
 	}{
 		{
-			"empty path",
-			paths["empty"], false,
-			func() {},
-			func() {},
+			title: "empty path",
+			param: paths["empty"], expected: false,
+			createImage:  func() {},
+			destroyImage: func() {},
 		},
 		{
-			"directory, not a file",
-			paths["directory"],
-			false,
-			func() {},
-			func() {},
+			title:        "directory, not a file",
+			param:        paths["directory"],
+			expected:     false,
+			createImage:  func() {},
+			destroyImage: func() {},
 		},
 		{
-			"missing file",
-			paths["missing"],
-			false,
-			func() {},
-			func() {},
+			title:        "missing file",
+			param:        paths["missing"],
+			expected:     false,
+			createImage:  func() {},
+			destroyImage: func() {},
 		},
 		{
-			"valid png",
-			paths["png"],
-			true,
-			func() {
-				img := image.NewRGBA(image.Rectangle{image.Point{0, 0}, image.Point{10, 10}})
+			title:    "valid png",
+			param:    paths["png"],
+			expected: true,
+			createImage: func() {
+				img := image.NewRGBA(image.Rectangle{Min: image.Point{X: 0, Y: 0}, Max: image.Point{X: 10, Y: 10}})
 				f, _ := os.Create(paths["png"])
 				err := png.Encode(f, img)
 				if err != nil {
 					panic(fmt.Sprintf("Could not encode file in PNG. Error: %s", err))
 				}
 			},
-			func() {
+			destroyImage: func() {
 				os.Remove(paths["png"])
 			},
 		},
 		{
-			"valid jpeg",
-			paths["jpeg"],
-			true,
-			func() {
+			title:    "valid jpeg",
+			param:    paths["jpeg"],
+			expected: true,
+			createImage: func() {
 				var opt jpeg.Options
 				img := image.NewGray(image.Rect(0, 0, 10, 10))
 				f, _ := os.Create(paths["jpeg"])
@@ -5806,16 +5767,16 @@ func TestImageValidation(t *testing.T) {
 					panic(fmt.Sprintf("Could not encode file in JPEG. Error: %s", err))
 				}
 			},
-			func() {
+			destroyImage: func() {
 				os.Remove(paths["jpeg"])
 			},
 		},
 		{
-			"valid mp3",
-			paths["mp3"],
-			false,
-			func() {},
-			func() {},
+			title:        "valid mp3",
+			param:        paths["mp3"],
+			expected:     false,
+			createImage:  func() {},
+			destroyImage: func() {},
 		},
 	}
 
@@ -5848,11 +5809,11 @@ func TestFilePathValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"empty filepath", "", false},
-		{"valid filepath", filepath.Join("testdata", "a.go"), true},
-		{"invalid filepath", filepath.Join("testdata", "no\000.go"), false},
-		{"directory, not a filepath", "testdata" + string(os.PathSeparator), false},
-		{"directory", "testdata", false},
+		{title: "empty filepath", param: "", expected: false},
+		{title: "valid filepath", param: filepath.Join("testdata", "a.go"), expected: true},
+		{title: "invalid filepath", param: filepath.Join("testdata", "no\000.go"), expected: false},
+		{title: "directory, not a filepath", param: "testdata" + string(os.PathSeparator), expected: false},
+		{title: "directory", param: "testdata", expected: false},
 	}
 
 	for _, test := range tests {
@@ -5867,7 +5828,6 @@ func TestFilePathValidation(t *testing.T) {
 				t.Fatalf("Test: '%s' failed Error: %s", test.title, errs)
 			}
 		}
-
 	}
 
 	PanicMatches(t, func() {
@@ -5883,32 +5843,31 @@ func TestEthereumAddressValidation(t *testing.T) {
 		expected bool
 	}{
 		// All caps.
-		{"0x52908400098527886E0F7030069857D2E4169EE7", true},
-		{"0x8617E340B3D01FA5F11F306F4090FD50E238070D", true},
+		{param: "0x52908400098527886E0F7030069857D2E4169EE7", expected: true},
+		{param: "0x8617E340B3D01FA5F11F306F4090FD50E238070D", expected: true},
 
 		// All lower.
-		{"0xde709f2102306220921060314715629080e2fb77", true},
-		{"0x27b1fdb04752bbc536007a920d24acb045561c26", true},
-		{"0x123f681646d4a755815f9cb19e1acc8565a0c2ac", true},
+		{param: "0xde709f2102306220921060314715629080e2fb77", expected: true},
+		{param: "0x27b1fdb04752bbc536007a920d24acb045561c26", expected: true},
+		{param: "0x123f681646d4a755815f9cb19e1acc8565a0c2ac", expected: true},
 
 		// Mixed case: runs checksum validation.
-		{"0x02F9AE5f22EA3fA88F05780B30385bECFacbf130", true},
-		{"0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed", true},
-		{"0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359", true},
-		{"0xdbF03B407c01E7cD3CBea99509d93f8DDDC8C6FB", true},
-		{"0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb", true},
-		{"0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDB", true}, // Invalid checksum, but valid address.
+		{param: "0x02F9AE5f22EA3fA88F05780B30385bECFacbf130", expected: true},
+		{param: "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed", expected: true},
+		{param: "0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359", expected: true},
+		{param: "0xdbF03B407c01E7cD3CBea99509d93f8DDDC8C6FB", expected: true},
+		{param: "0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb", expected: true},
+		{param: "0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDB", expected: true}, // Invalid checksum, but valid address.
 
 		// Other.
-		{"", false},
-		{"D1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb", false},    // Missing "0x" prefix.
-		{"0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDbc", false}, // More than 40 hex digits.
-		{"0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aD", false},   // Less than 40 hex digits.
-		{"0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDw", false},  // Invalid hex digit "w".
+		{param: "", expected: false},
+		{param: "D1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb", expected: false},    // Missing "0x" prefix.
+		{param: "0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDbc", expected: false}, // More than 40 hex digits.
+		{param: "0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aD", expected: false},   // Less than 40 hex digits.
+		{param: "0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDw", expected: false},  // Invalid hex digit "w".
 	}
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "eth_addr")
 
 		if test.expected {
@@ -5936,29 +5895,28 @@ func TestEthereumAddressChecksumValidation(t *testing.T) {
 		expected bool
 	}{
 		// All caps.
-		{"0x52908400098527886E0F7030069857D2E4169EE7", true},
-		{"0x8617E340B3D01FA5F11F306F4090FD50E238070D", true},
+		{param: "0x52908400098527886E0F7030069857D2E4169EE7", expected: true},
+		{param: "0x8617E340B3D01FA5F11F306F4090FD50E238070D", expected: true},
 
 		// All lower.
-		{"0x27b1fdb04752bbc536007a920d24acb045561c26", true},
-		{"0x123f681646d4a755815f9cb19e1acc8565a0c2ac", false},
+		{param: "0x27b1fdb04752bbc536007a920d24acb045561c26", expected: true},
+		{param: "0x123f681646d4a755815f9cb19e1acc8565a0c2ac", expected: false},
 
 		// Mixed case: runs checksum validation.
-		{"0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb", true},
-		{"0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDB", false}, // Invalid checksum.
-		{"0x000000000000000000000000000000000000dead", false}, // Invalid checksum.
-		{"0x000000000000000000000000000000000000dEaD", true},  // Valid checksum.
+		{param: "0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb", expected: true},
+		{param: "0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDB", expected: false}, // Invalid checksum.
+		{param: "0x000000000000000000000000000000000000dead", expected: false}, // Invalid checksum.
+		{param: "0x000000000000000000000000000000000000dEaD", expected: true},  // Valid checksum.
 
 		// Other.
-		{"", false},
-		{"D1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb", false},    // Missing "0x" prefix.
-		{"0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDbc", false}, // More than 40 hex digits.
-		{"0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aD", false},   // Less than 40 hex digits.
-		{"0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDw", false},  // Invalid hex digit "w".
+		{param: "", expected: false},
+		{param: "D1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb", expected: false},    // Missing "0x" prefix.
+		{param: "0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDbc", expected: false}, // More than 40 hex digits.
+		{param: "0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aD", expected: false},   // Less than 40 hex digits.
+		{param: "0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDw", expected: false},  // Invalid hex digit "w".
 	}
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "eth_addr_checksum")
 
 		if test.expected {
@@ -5985,89 +5943,88 @@ func TestBitcoinAddressValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"x", false},
-		{"0x02F9AE5f22EA3fA88F05780B30385bEC", false},
-		{"1A1zP1ePQGefi2DMPTifTL5SLmv7DivfNa", false},
-		{"1P9RQEr2XeE3PEb44ZE35sfZRRW1JH8Uqx", false},
-		{"3P14159I73E4gFr7JterCCQh9QjiTjiZrG", false},
-		{"3P141597f3E4gFr7JterCCQh9QjiTjiZrG", false},
-		{"37qgekLpCCHrQuSjvX3fs496FWTGsHFHizjJAs6NPcR47aefnnCWECAhHV6E3g4YN7u7Yuwod5Y", false},
-		{"dzb7VV1Ui55BARxv7ATxAtCUeJsANKovDGWFVgpTbhq9gvPqP3yv", false},
-		{"MuNu7ZAEDFiHthiunm7dPjwKqrVNCM3mAz6rP9zFveQu14YA8CxExSJTHcVP9DErn6u84E6Ej7S", false},
-		{"rPpQpYknyNQ5AEHuY6H8ijJJrYc2nDKKk9jjmKEXsWzyAQcFGpDLU2Zvsmoi8JLR7hAwoy3RQWf", false},
-		{"4Uc3FmN6NQ6zLBK5QQBXRBUREaaHwCZYsGCueHauuDmJpZKn6jkEskMB2Zi2CNgtb5r6epWEFfUJq", false},
-		{"7aQgR5DFQ25vyXmqZAWmnVCjL3PkBcdVkBUpjrjMTcghHx3E8wb", false},
-		{"17QpPprjeg69fW1DV8DcYYCKvWjYhXvWkov6MJ1iTTvMFj6weAqW7wybZeH57WTNxXVCRH4veVs", false},
-		{"KxuACDviz8Xvpn1xAh9MfopySZNuyajYMZWz16Dv2mHHryznWUp3", false},
-		{"7nK3GSmqdXJQtdohvGfJ7KsSmn3TmGqExug49583bDAL91pVSGq5xS9SHoAYL3Wv3ijKTit65th", false},
-		{"cTivdBmq7bay3RFGEBBuNfMh2P1pDCgRYN2Wbxmgwr4ki3jNUL2va", false},
-		{"gjMV4vjNjyMrna4fsAr8bWxAbwtmMUBXJS3zL4NJt5qjozpbQLmAfK1uA3CquSqsZQMpoD1g2nk", false},
-		{"emXm1naBMoVzPjbk7xpeTVMFy4oDEe25UmoyGgKEB1gGWsK8kRGs", false},
-		{"7VThQnNRj1o3Zyvc7XHPRrjDf8j2oivPTeDXnRPYWeYGE4pXeRJDZgf28ppti5hsHWXS2GSobdqyo", false},
-		{"1G9u6oCVCPh2o8m3t55ACiYvG1y5BHewUkDSdiQarDcYXXhFHYdzMdYfUAhfxn5vNZBwpgUNpso", false},
-		{"31QQ7ZMLkScDiB4VyZjuptr7AEc9j1SjstF7pRoLhHTGkW4Q2y9XELobQmhhWxeRvqcukGd1XCq", false},
-		{"DHqKSnpxa8ZdQyH8keAhvLTrfkyBMQxqngcQA5N8LQ9KVt25kmGN", false},
-		{"2LUHcJPbwLCy9GLH1qXmfmAwvadWw4bp4PCpDfduLqV17s6iDcy1imUwhQJhAoNoN1XNmweiJP4i", false},
-		{"7USRzBXAnmck8fX9HmW7RAb4qt92VFX6soCnts9s74wxm4gguVhtG5of8fZGbNPJA83irHVY6bCos", false},
-		{"1DGezo7BfVebZxAbNT3XGujdeHyNNBF3vnficYoTSp4PfK2QaML9bHzAMxke3wdKdHYWmsMTJVu", false},
-		{"2D12DqDZKwCxxkzs1ZATJWvgJGhQ4cFi3WrizQ5zLAyhN5HxuAJ1yMYaJp8GuYsTLLxTAz6otCfb", false},
-		{"8AFJzuTujXjw1Z6M3fWhQ1ujDW7zsV4ePeVjVo7D1egERqSW9nZ", false},
-		{"163Q17qLbTCue8YY3AvjpUhotuaodLm2uqMhpYirsKjVqnxJRWTEoywMVY3NbBAHuhAJ2cF9GAZ", false},
-		{"2MnmgiRH4eGLyLc9eAqStzk7dFgBjFtUCtu", false},
-		{"461QQ2sYWxU7H2PV4oBwJGNch8XVTYYbZxU", false},
-		{"2UCtv53VttmQYkVU4VMtXB31REvQg4ABzs41AEKZ8UcB7DAfVzdkV9JDErwGwyj5AUHLkmgZeobs", false},
-		{"cSNjAsnhgtiFMi6MtfvgscMB2Cbhn2v1FUYfviJ1CdjfidvmeW6mn", false},
-		{"gmsow2Y6EWAFDFE1CE4Hd3Tpu2BvfmBfG1SXsuRARbnt1WjkZnFh1qGTiptWWbjsq2Q6qvpgJVj", false},
-		{"nksUKSkzS76v8EsSgozXGMoQFiCoCHzCVajFKAXqzK5on9ZJYVHMD5CKwgmX3S3c7M1U3xabUny", false},
-		{"L3favK1UzFGgdzYBF2oBT5tbayCo4vtVBLJhg2iYuMeePxWG8SQc", false},
-		{"7VxLxGGtYT6N99GdEfi6xz56xdQ8nP2dG1CavuXx7Rf2PrvNMTBNevjkfgs9JmkcGm6EXpj8ipyPZ ", false},
-		{"2mbZwFXF6cxShaCo2czTRB62WTx9LxhTtpP", false},
-		{"dB7cwYdcPSgiyAwKWL3JwCVwSk6epU2txw", false},
-		{"HPhFUhUAh8ZQQisH8QQWafAxtQYju3SFTX", false},
-		{"4ctAH6AkHzq5ioiM1m9T3E2hiYEev5mTsB", false},
-		{"31uEbMgunupShBVTewXjtqbBv5MndwfXhb", false},
-		{"175tWpb8K1S7NmH4Zx6rewF9WQrcZv245W", false},
-		{"Hn1uFi4dNexWrqARpjMqgT6cX1UsNPuV3cHdGg9ExyXw8HTKadbktRDtdeVmY3M1BxJStiL4vjJ", false},
-		{"Sq3fDbvutABmnAHHExJDgPLQn44KnNC7UsXuT7KZecpaYDMU9Txs", false},
-		{"6TqWyrqdgUEYDQU1aChMuFMMEimHX44qHFzCUgGfqxGgZNMUVWJ", false},
-		{"giqJo7oWqFxNKWyrgcBxAVHXnjJ1t6cGoEffce5Y1y7u649Noj5wJ4mmiUAKEVVrYAGg2KPB3Y4", false},
-		{"cNzHY5e8vcmM3QVJUcjCyiKMYfeYvyueq5qCMV3kqcySoLyGLYUK", false},
-		{"37uTe568EYc9WLoHEd9jXEvUiWbq5LFLscNyqvAzLU5vBArUJA6eydkLmnMwJDjkL5kXc2VK7ig", false},
-		{"EsYbG4tWWWY45G31nox838qNdzksbPySWc", false},
-		{"nbuzhfwMoNzA3PaFnyLcRxE9bTJPDkjZ6Rf6Y6o2ckXZfzZzXBT", false},
-		{"cQN9PoxZeCWK1x56xnz6QYAsvR11XAce3Ehp3gMUdfSQ53Y2mPzx", false},
-		{"1Gm3N3rkef6iMbx4voBzaxtXcmmiMTqZPhcuAepRzYUJQW4qRpEnHvMojzof42hjFRf8PE2jPde", false},
-		{"2TAq2tuN6x6m233bpT7yqdYQPELdTDJn1eU", false},
-		{"ntEtnnGhqPii4joABvBtSEJG6BxjT2tUZqE8PcVYgk3RHpgxgHDCQxNbLJf7ardf1dDk2oCQ7Cf", false},
-		{"Ky1YjoZNgQ196HJV3HpdkecfhRBmRZdMJk89Hi5KGfpfPwS2bUbfd", false},
-		{"2A1q1YsMZowabbvta7kTy2Fd6qN4r5ZCeG3qLpvZBMzCixMUdkN2Y4dHB1wPsZAeVXUGD83MfRED", false},
-		{"1AGNa15ZQXAZUgFiqJ2i7Z2DPU2J6hW62i", true},
-		{"1Ax4gZtb7gAit2TivwejZHYtNNLT18PUXJ", true},
-		{"1C5bSj1iEGUgSTbziymG7Cn18ENQuT36vv", true},
-		{"1Gqk4Tv79P91Cc1STQtU3s1W6277M2CVWu", true},
-		{"1JwMWBVLtiqtscbaRHai4pqHokhFCbtoB4", true},
-		{"19dcawoKcZdQz365WpXWMhX6QCUpR9SY4r", true},
-		{"13p1ijLwsnrcuyqcTvJXkq2ASdXqcnEBLE", true},
-		{"1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2", true},
-		{"3P14159f73E4gFr7JterCCQh9QjiTjiZrG", true},
-		{"3CMNFxN1oHBc4R1EpboAL5yzHGgE611Xou", true},
-		{"3QjYXhTkvuj8qPaXHTTWb5wjXhdsLAAWVy", true},
-		{"3AnNxabYGoTxYiTEZwFEnerUoeFXK2Zoks", true},
-		{"33vt8ViH5jsr115AGkW6cEmEz9MpvJSwDk", true},
-		{"3QCzvfL4ZRvmJFiWWBVwxfdaNBT8EtxB5y", true},
-		{"37Sp6Rv3y4kVd1nQ1JV5pfqXccHNyZm1x3", true},
-		{"3ALJH9Y951VCGcVZYAdpA3KchoP9McEj1G", true},
-		{"12KYrjTdVGjFMtaxERSk3gphreJ5US8aUP", true},
-		{"12QeMLzSrB8XH8FvEzPMVoRxVAzTr5XM2y", true},
-		{"1oNLrsHnBcR6dpaBpwz3LSwutbUNkNSjs", true},
-		{"1SQHtwR5oJRKLfiWQ2APsAd9miUc4k2ez", true},
-		{"116CGDLddrZhMrTwhCVJXtXQpxygTT1kHd", true},
-		{"3NJZLcZEEYBpxYEUGewU4knsQRn1WM5Fkt", true},
+		{param: "", expected: false},
+		{param: "x", expected: false},
+		{param: "0x02F9AE5f22EA3fA88F05780B30385bEC", expected: false},
+		{param: "1A1zP1ePQGefi2DMPTifTL5SLmv7DivfNa", expected: false},
+		{param: "1P9RQEr2XeE3PEb44ZE35sfZRRW1JH8Uqx", expected: false},
+		{param: "3P14159I73E4gFr7JterCCQh9QjiTjiZrG", expected: false},
+		{param: "3P141597f3E4gFr7JterCCQh9QjiTjiZrG", expected: false},
+		{param: "37qgekLpCCHrQuSjvX3fs496FWTGsHFHizjJAs6NPcR47aefnnCWECAhHV6E3g4YN7u7Yuwod5Y", expected: false},
+		{param: "dzb7VV1Ui55BARxv7ATxAtCUeJsANKovDGWFVgpTbhq9gvPqP3yv", expected: false},
+		{param: "MuNu7ZAEDFiHthiunm7dPjwKqrVNCM3mAz6rP9zFveQu14YA8CxExSJTHcVP9DErn6u84E6Ej7S", expected: false},
+		{param: "rPpQpYknyNQ5AEHuY6H8ijJJrYc2nDKKk9jjmKEXsWzyAQcFGpDLU2Zvsmoi8JLR7hAwoy3RQWf", expected: false},
+		{param: "4Uc3FmN6NQ6zLBK5QQBXRBUREaaHwCZYsGCueHauuDmJpZKn6jkEskMB2Zi2CNgtb5r6epWEFfUJq", expected: false},
+		{param: "7aQgR5DFQ25vyXmqZAWmnVCjL3PkBcdVkBUpjrjMTcghHx3E8wb", expected: false},
+		{param: "17QpPprjeg69fW1DV8DcYYCKvWjYhXvWkov6MJ1iTTvMFj6weAqW7wybZeH57WTNxXVCRH4veVs", expected: false},
+		{param: "KxuACDviz8Xvpn1xAh9MfopySZNuyajYMZWz16Dv2mHHryznWUp3", expected: false},
+		{param: "7nK3GSmqdXJQtdohvGfJ7KsSmn3TmGqExug49583bDAL91pVSGq5xS9SHoAYL3Wv3ijKTit65th", expected: false},
+		{param: "cTivdBmq7bay3RFGEBBuNfMh2P1pDCgRYN2Wbxmgwr4ki3jNUL2va", expected: false},
+		{param: "gjMV4vjNjyMrna4fsAr8bWxAbwtmMUBXJS3zL4NJt5qjozpbQLmAfK1uA3CquSqsZQMpoD1g2nk", expected: false},
+		{param: "emXm1naBMoVzPjbk7xpeTVMFy4oDEe25UmoyGgKEB1gGWsK8kRGs", expected: false},
+		{param: "7VThQnNRj1o3Zyvc7XHPRrjDf8j2oivPTeDXnRPYWeYGE4pXeRJDZgf28ppti5hsHWXS2GSobdqyo", expected: false},
+		{param: "1G9u6oCVCPh2o8m3t55ACiYvG1y5BHewUkDSdiQarDcYXXhFHYdzMdYfUAhfxn5vNZBwpgUNpso", expected: false},
+		{param: "31QQ7ZMLkScDiB4VyZjuptr7AEc9j1SjstF7pRoLhHTGkW4Q2y9XELobQmhhWxeRvqcukGd1XCq", expected: false},
+		{param: "DHqKSnpxa8ZdQyH8keAhvLTrfkyBMQxqngcQA5N8LQ9KVt25kmGN", expected: false},
+		{param: "2LUHcJPbwLCy9GLH1qXmfmAwvadWw4bp4PCpDfduLqV17s6iDcy1imUwhQJhAoNoN1XNmweiJP4i", expected: false},
+		{param: "7USRzBXAnmck8fX9HmW7RAb4qt92VFX6soCnts9s74wxm4gguVhtG5of8fZGbNPJA83irHVY6bCos", expected: false},
+		{param: "1DGezo7BfVebZxAbNT3XGujdeHyNNBF3vnficYoTSp4PfK2QaML9bHzAMxke3wdKdHYWmsMTJVu", expected: false},
+		{param: "2D12DqDZKwCxxkzs1ZATJWvgJGhQ4cFi3WrizQ5zLAyhN5HxuAJ1yMYaJp8GuYsTLLxTAz6otCfb", expected: false},
+		{param: "8AFJzuTujXjw1Z6M3fWhQ1ujDW7zsV4ePeVjVo7D1egERqSW9nZ", expected: false},
+		{param: "163Q17qLbTCue8YY3AvjpUhotuaodLm2uqMhpYirsKjVqnxJRWTEoywMVY3NbBAHuhAJ2cF9GAZ", expected: false},
+		{param: "2MnmgiRH4eGLyLc9eAqStzk7dFgBjFtUCtu", expected: false},
+		{param: "461QQ2sYWxU7H2PV4oBwJGNch8XVTYYbZxU", expected: false},
+		{param: "2UCtv53VttmQYkVU4VMtXB31REvQg4ABzs41AEKZ8UcB7DAfVzdkV9JDErwGwyj5AUHLkmgZeobs", expected: false},
+		{param: "cSNjAsnhgtiFMi6MtfvgscMB2Cbhn2v1FUYfviJ1CdjfidvmeW6mn", expected: false},
+		{param: "gmsow2Y6EWAFDFE1CE4Hd3Tpu2BvfmBfG1SXsuRARbnt1WjkZnFh1qGTiptWWbjsq2Q6qvpgJVj", expected: false},
+		{param: "nksUKSkzS76v8EsSgozXGMoQFiCoCHzCVajFKAXqzK5on9ZJYVHMD5CKwgmX3S3c7M1U3xabUny", expected: false},
+		{param: "L3favK1UzFGgdzYBF2oBT5tbayCo4vtVBLJhg2iYuMeePxWG8SQc", expected: false},
+		{param: "7VxLxGGtYT6N99GdEfi6xz56xdQ8nP2dG1CavuXx7Rf2PrvNMTBNevjkfgs9JmkcGm6EXpj8ipyPZ ", expected: false},
+		{param: "2mbZwFXF6cxShaCo2czTRB62WTx9LxhTtpP", expected: false},
+		{param: "dB7cwYdcPSgiyAwKWL3JwCVwSk6epU2txw", expected: false},
+		{param: "HPhFUhUAh8ZQQisH8QQWafAxtQYju3SFTX", expected: false},
+		{param: "4ctAH6AkHzq5ioiM1m9T3E2hiYEev5mTsB", expected: false},
+		{param: "31uEbMgunupShBVTewXjtqbBv5MndwfXhb", expected: false},
+		{param: "175tWpb8K1S7NmH4Zx6rewF9WQrcZv245W", expected: false},
+		{param: "Hn1uFi4dNexWrqARpjMqgT6cX1UsNPuV3cHdGg9ExyXw8HTKadbktRDtdeVmY3M1BxJStiL4vjJ", expected: false},
+		{param: "Sq3fDbvutABmnAHHExJDgPLQn44KnNC7UsXuT7KZecpaYDMU9Txs", expected: false},
+		{param: "6TqWyrqdgUEYDQU1aChMuFMMEimHX44qHFzCUgGfqxGgZNMUVWJ", expected: false},
+		{param: "giqJo7oWqFxNKWyrgcBxAVHXnjJ1t6cGoEffce5Y1y7u649Noj5wJ4mmiUAKEVVrYAGg2KPB3Y4", expected: false},
+		{param: "cNzHY5e8vcmM3QVJUcjCyiKMYfeYvyueq5qCMV3kqcySoLyGLYUK", expected: false},
+		{param: "37uTe568EYc9WLoHEd9jXEvUiWbq5LFLscNyqvAzLU5vBArUJA6eydkLmnMwJDjkL5kXc2VK7ig", expected: false},
+		{param: "EsYbG4tWWWY45G31nox838qNdzksbPySWc", expected: false},
+		{param: "nbuzhfwMoNzA3PaFnyLcRxE9bTJPDkjZ6Rf6Y6o2ckXZfzZzXBT", expected: false},
+		{param: "cQN9PoxZeCWK1x56xnz6QYAsvR11XAce3Ehp3gMUdfSQ53Y2mPzx", expected: false},
+		{param: "1Gm3N3rkef6iMbx4voBzaxtXcmmiMTqZPhcuAepRzYUJQW4qRpEnHvMojzof42hjFRf8PE2jPde", expected: false},
+		{param: "2TAq2tuN6x6m233bpT7yqdYQPELdTDJn1eU", expected: false},
+		{param: "ntEtnnGhqPii4joABvBtSEJG6BxjT2tUZqE8PcVYgk3RHpgxgHDCQxNbLJf7ardf1dDk2oCQ7Cf", expected: false},
+		{param: "Ky1YjoZNgQ196HJV3HpdkecfhRBmRZdMJk89Hi5KGfpfPwS2bUbfd", expected: false},
+		{param: "2A1q1YsMZowabbvta7kTy2Fd6qN4r5ZCeG3qLpvZBMzCixMUdkN2Y4dHB1wPsZAeVXUGD83MfRED", expected: false},
+		{param: "1AGNa15ZQXAZUgFiqJ2i7Z2DPU2J6hW62i", expected: true},
+		{param: "1Ax4gZtb7gAit2TivwejZHYtNNLT18PUXJ", expected: true},
+		{param: "1C5bSj1iEGUgSTbziymG7Cn18ENQuT36vv", expected: true},
+		{param: "1Gqk4Tv79P91Cc1STQtU3s1W6277M2CVWu", expected: true},
+		{param: "1JwMWBVLtiqtscbaRHai4pqHokhFCbtoB4", expected: true},
+		{param: "19dcawoKcZdQz365WpXWMhX6QCUpR9SY4r", expected: true},
+		{param: "13p1ijLwsnrcuyqcTvJXkq2ASdXqcnEBLE", expected: true},
+		{param: "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2", expected: true},
+		{param: "3P14159f73E4gFr7JterCCQh9QjiTjiZrG", expected: true},
+		{param: "3CMNFxN1oHBc4R1EpboAL5yzHGgE611Xou", expected: true},
+		{param: "3QjYXhTkvuj8qPaXHTTWb5wjXhdsLAAWVy", expected: true},
+		{param: "3AnNxabYGoTxYiTEZwFEnerUoeFXK2Zoks", expected: true},
+		{param: "33vt8ViH5jsr115AGkW6cEmEz9MpvJSwDk", expected: true},
+		{param: "3QCzvfL4ZRvmJFiWWBVwxfdaNBT8EtxB5y", expected: true},
+		{param: "37Sp6Rv3y4kVd1nQ1JV5pfqXccHNyZm1x3", expected: true},
+		{param: "3ALJH9Y951VCGcVZYAdpA3KchoP9McEj1G", expected: true},
+		{param: "12KYrjTdVGjFMtaxERSk3gphreJ5US8aUP", expected: true},
+		{param: "12QeMLzSrB8XH8FvEzPMVoRxVAzTr5XM2y", expected: true},
+		{param: "1oNLrsHnBcR6dpaBpwz3LSwutbUNkNSjs", expected: true},
+		{param: "1SQHtwR5oJRKLfiWQ2APsAd9miUc4k2ez", expected: true},
+		{param: "116CGDLddrZhMrTwhCVJXtXQpxygTT1kHd", expected: true},
+		{param: "3NJZLcZEEYBpxYEUGewU4knsQRn1WM5Fkt", expected: true},
 	}
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "btc_addr")
 
 		if test.expected {
@@ -6094,30 +6051,29 @@ func TestBitcoinBech32AddressValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"bc1rw5uspcuh", false},
-		{"bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t5", false},
-		{"BC13W508D6QEJXTDG4Y5R3ZARVARY0C5XW7KN40WF2", false},
-		{"qw508d6qejxtdg4y5r3zarvary0c5xw7kg3g4ty", false},
-		{"bc1rw5uspcuh", false},
-		{"bc10w508d6qejxtdg4y5r3zarvary0c5xw7kw508d6qejxtdg4y5r3zarvary0c5xw7kw5rljs90", false},
-		{"BC1QW508d6QEJxTDG4y5R3ZArVARY0C5XW7KV8F3T4", false},
-		{"BC1QR508D6QEJXTDG4Y5R3ZARVARYV98GJ9P", false},
-		{"bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t5", false},
-		{"bc10w508d6qejxtdg4y5r3zarvary0c5xw7kw508d6qejxtdg4y5r3zarvary0c5xw7kw5rljs90", false},
-		{"bc1pw508d6qejxtdg4y5r3zarqfsj6c3", false},
-		{"bc1zw508d6qejxtdg4y5r3zarvaryvqyzf3du", false},
-		{"bc1gmk9yu", false},
-		{"bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3pjxtptv", false},
-		{"BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4", true},
-		{"bc1pw508d6qejxtdg4y5r3zarvary0c5xw7kw508d6qejxtdg4y5r3zarvary0c5xw7k7grplx", true},
-		{"bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3", true},
-		{"BC1SW50QA3JX3S", true},
-		{"bc1zw508d6qejxtdg4y5r3zarvaryvg6kdaj", true},
+		{param: "", expected: false},
+		{param: "bc1rw5uspcuh", expected: false},
+		{param: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t5", expected: false},
+		{param: "BC13W508D6QEJXTDG4Y5R3ZARVARY0C5XW7KN40WF2", expected: false},
+		{param: "qw508d6qejxtdg4y5r3zarvary0c5xw7kg3g4ty", expected: false},
+		{param: "bc1rw5uspcuh", expected: false},
+		{param: "bc10w508d6qejxtdg4y5r3zarvary0c5xw7kw508d6qejxtdg4y5r3zarvary0c5xw7kw5rljs90", expected: false},
+		{param: "BC1QW508d6QEJxTDG4y5R3ZArVARY0C5XW7KV8F3T4", expected: false},
+		{param: "BC1QR508D6QEJXTDG4Y5R3ZARVARYV98GJ9P", expected: false},
+		{param: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t5", expected: false},
+		{param: "bc10w508d6qejxtdg4y5r3zarvary0c5xw7kw508d6qejxtdg4y5r3zarvary0c5xw7kw5rljs90", expected: false},
+		{param: "bc1pw508d6qejxtdg4y5r3zarqfsj6c3", expected: false},
+		{param: "bc1zw508d6qejxtdg4y5r3zarvaryvqyzf3du", expected: false},
+		{param: "bc1gmk9yu", expected: false},
+		{param: "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3pjxtptv", expected: false},
+		{param: "BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4", expected: true},
+		{param: "bc1pw508d6qejxtdg4y5r3zarvary0c5xw7kw508d6qejxtdg4y5r3zarvary0c5xw7k7grplx", expected: true},
+		{param: "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3", expected: true},
+		{param: "BC1SW50QA3JX3S", expected: true},
+		{param: "bc1zw508d6qejxtdg4y5r3zarvaryvg6kdaj", expected: true},
 	}
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "btc_addr_bech32")
 
 		if test.expected {
@@ -6324,16 +6280,16 @@ func TestGtField(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationTest = &TimeDurationTest{time.Hour, time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{First: time.Hour, Second: time.Hour - time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour, time.Hour}
+	timeDurationTest = &TimeDurationTest{First: time.Hour, Second: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.First", "TimeDurationTest.First", "First", "First", "gtfield")
 
-	timeDurationTest = &TimeDurationTest{time.Hour, time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{First: time.Hour, Second: time.Hour + time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.First", "TimeDurationTest.First", "First", "First", "gtfield")
@@ -6343,7 +6299,7 @@ func TestGtField(t *testing.T) {
 		Second time.Duration
 	}
 
-	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{time.Duration(0), time.Hour}
+	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{First: time.Duration(0), Second: time.Hour}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 
@@ -6551,16 +6507,16 @@ func TestLtField(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationTest = &TimeDurationTest{time.Hour, time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{First: time.Hour, Second: time.Hour + time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour, time.Hour}
+	timeDurationTest = &TimeDurationTest{First: time.Hour, Second: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.First", "TimeDurationTest.First", "First", "First", "ltfield")
 
-	timeDurationTest = &TimeDurationTest{time.Hour, time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{First: time.Hour, Second: time.Hour - time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.First", "TimeDurationTest.First", "First", "First", "ltfield")
@@ -6570,7 +6526,7 @@ func TestLtField(t *testing.T) {
 		Second time.Duration
 	}
 
-	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{time.Duration(0), -time.Minute}
+	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{First: time.Duration(0), Second: -time.Minute}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 
@@ -6885,15 +6841,15 @@ func TestLteField(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationTest = &TimeDurationTest{time.Hour, time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{First: time.Hour, Second: time.Hour + time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour, time.Hour}
+	timeDurationTest = &TimeDurationTest{First: time.Hour, Second: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour, time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{First: time.Hour, Second: time.Hour - time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.First", "TimeDurationTest.First", "First", "First", "ltefield")
@@ -6903,7 +6859,7 @@ func TestLteField(t *testing.T) {
 		Second time.Duration
 	}
 
-	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{time.Duration(0), -time.Minute}
+	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{First: time.Duration(0), Second: -time.Minute}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 
@@ -7095,15 +7051,15 @@ func TestGteField(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationTest = &TimeDurationTest{time.Hour, time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{First: time.Hour, Second: time.Hour - time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour, time.Hour}
+	timeDurationTest = &TimeDurationTest{First: time.Hour, Second: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour, time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{First: time.Hour, Second: time.Hour + time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.First", "TimeDurationTest.First", "First", "First", "gtefield")
@@ -7113,7 +7069,7 @@ func TestGteField(t *testing.T) {
 		Second time.Duration
 	}
 
-	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{time.Duration(0), time.Hour}
+	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{First: time.Duration(0), Second: time.Hour}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 
@@ -7425,16 +7381,16 @@ func TestIsGt(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationTest = &TimeDurationTest{time.Hour}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour - time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "gt")
 
-	timeDurationTest = &TimeDurationTest{time.Hour - 2*time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour - 2*time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "gt")
@@ -7443,7 +7399,7 @@ func TestIsGt(t *testing.T) {
 		Duration time.Duration `validate:"omitempty,gt=59m"`
 	}
 
-	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{time.Duration(0)}
+	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{Duration: time.Duration(0)}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 }
@@ -7509,15 +7465,15 @@ func TestIsGte(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationTest = &TimeDurationTest{time.Hour}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour - time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour - 2*time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour - 2*time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "gte")
@@ -7526,7 +7482,7 @@ func TestIsGte(t *testing.T) {
 		Duration time.Duration `validate:"omitempty,gte=59m"`
 	}
 
-	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{time.Duration(0)}
+	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{Duration: time.Duration(0)}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 }
@@ -7559,15 +7515,15 @@ func TestMinValidation(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationTest = &TimeDurationTest{time.Hour}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour - time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour - 2*time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour - 2*time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "min")
@@ -7576,7 +7532,7 @@ func TestMinValidation(t *testing.T) {
 		Duration time.Duration `validate:"omitempty,min=59m"`
 	}
 
-	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{time.Duration(0)}
+	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{Duration: time.Duration(0)}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 }
@@ -7609,15 +7565,15 @@ func TestMaxValidation(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationTest = &TimeDurationTest{time.Hour}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour + time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour + 2*time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour + 2*time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "max")
@@ -7626,7 +7582,7 @@ func TestMaxValidation(t *testing.T) {
 		Duration time.Duration `validate:"omitempty,max=-1s"`
 	}
 
-	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{time.Duration(0)}
+	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{Duration: time.Duration(0)}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 }
@@ -7666,24 +7622,24 @@ func TestMinMaxValidation(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationTest = &TimeDurationTest{time.Hour}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour - time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour + time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour - 2*time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour - 2*time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "min")
 
-	timeDurationTest = &TimeDurationTest{time.Hour + 2*time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour + 2*time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "max")
@@ -7692,7 +7648,7 @@ func TestMinMaxValidation(t *testing.T) {
 		Duration time.Duration `validate:"omitempty,min=59m,max=1h1m"`
 	}
 
-	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{time.Duration(0)}
+	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{Duration: time.Duration(0)}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 }
@@ -7726,16 +7682,16 @@ func TestLenValidation(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationTest = &TimeDurationTest{time.Hour}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour - time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour - time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "len")
 
-	timeDurationTest = &TimeDurationTest{time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour + time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "len")
@@ -7744,7 +7700,7 @@ func TestLenValidation(t *testing.T) {
 		Duration time.Duration `validate:"omitempty,len=1h"`
 	}
 
-	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{time.Duration(0)}
+	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{Duration: time.Duration(0)}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 }
@@ -7827,16 +7783,16 @@ func TestIsLt(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationTest = &TimeDurationTest{time.Hour}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour + time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "lt")
 
-	timeDurationTest = &TimeDurationTest{time.Hour + 2*time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour + 2*time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "lt")
@@ -7845,7 +7801,7 @@ func TestIsLt(t *testing.T) {
 		Duration time.Duration `validate:"omitempty,lt=0"`
 	}
 
-	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{time.Duration(0)}
+	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{Duration: time.Duration(0)}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 }
@@ -7911,15 +7867,15 @@ func TestIsLte(t *testing.T) {
 	}
 	var timeDurationTest *TimeDurationTest
 
-	timeDurationTest = &TimeDurationTest{time.Hour}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour + time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour + time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	Equal(t, errs, nil)
 
-	timeDurationTest = &TimeDurationTest{time.Hour + 2*time.Minute}
+	timeDurationTest = &TimeDurationTest{Duration: time.Hour + 2*time.Minute}
 	errs = validate.Struct(timeDurationTest)
 	NotEqual(t, errs, nil)
 	AssertError(t, errs, "TimeDurationTest.Duration", "TimeDurationTest.Duration", "Duration", "Duration", "lte")
@@ -7928,7 +7884,7 @@ func TestIsLte(t *testing.T) {
 		Duration time.Duration `validate:"omitempty,lte=-1s"`
 	}
 
-	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{time.Duration(0)}
+	timeDurationOmitemptyTest := &TimeDurationOmitemptyTest{Duration: time.Duration(0)}
 	errs = validate.Struct(timeDurationOmitemptyTest)
 	Equal(t, errs, nil)
 }
@@ -7938,47 +7894,47 @@ func TestUrnRFC2141(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"urn:a:b", true},
-		{"urn:a::", true},
-		{"urn:a:-", true},
-		{"URN:simple:simple", true},
-		{"urn:urna:simple", true},
-		{"urn:burnout:nss", true},
-		{"urn:burn:nss", true},
-		{"urn:urnurnurn:x", true},
-		{"urn:abcdefghilmnopqrstuvzabcdefghilm:x", true},
-		{"URN:123:x", true},
-		{"URN:abcd-:x", true},
-		{"URN:abcd-abcd:x", true},
-		{"urn:urnx:urn", true},
-		{"urn:ciao:a:b:c", true},
-		{"urn:aaa:x:y:", true},
-		{"urn:ciao:-", true},
-		{"urn:colon:::::nss", true},
-		{"urn:ciao:@!=%2C(xyz)+a,b.*@g=$_'", true},
-		{"URN:hexes:%25", true},
-		{"URN:x:abc%1Dz%2F%3az", true},
-		{"URN:foo:a123,456", true},
-		{"urn:foo:a123,456", true},
-		{"urn:FOO:a123,456", true},
-		{"urn:foo:A123,456", true},
-		{"urn:foo:a123%2C456", true},
-		{"URN:FOO:a123%2c456", true},
-		{"URN:FOO:ABC%FFabc123%2c456", true},
-		{"URN:FOO:ABC%FFabc123%2C456%9A", true},
-		{"urn:ietf:params:scim:schemas:core:2.0:User", true},
-		{"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:meta.lastModified", true},
-		{"URN:-xxx:x", false},
-		{"urn::colon:nss", false},
-		{"urn:abcdefghilmnopqrstuvzabcdefghilmn:specificstring", false},
-		{"URN:a!?:x", false},
-		{"URN:#,:x", false},
-		{"urn:urn:NSS", false},
-		{"urn:URN:NSS", false},
-		{"urn:white space:NSS", false},
-		{"urn:concat:no spaces", false},
-		{"urn:a:%", false},
-		{"urn:", false},
+		{param: "urn:a:b", expected: true},
+		{param: "urn:a::", expected: true},
+		{param: "urn:a:-", expected: true},
+		{param: "URN:simple:simple", expected: true},
+		{param: "urn:urna:simple", expected: true},
+		{param: "urn:burnout:nss", expected: true},
+		{param: "urn:burn:nss", expected: true},
+		{param: "urn:urnurnurn:x", expected: true},
+		{param: "urn:abcdefghilmnopqrstuvzabcdefghilm:x", expected: true},
+		{param: "URN:123:x", expected: true},
+		{param: "URN:abcd-:x", expected: true},
+		{param: "URN:abcd-abcd:x", expected: true},
+		{param: "urn:urnx:urn", expected: true},
+		{param: "urn:ciao:a:b:c", expected: true},
+		{param: "urn:aaa:x:y:", expected: true},
+		{param: "urn:ciao:-", expected: true},
+		{param: "urn:colon:::::nss", expected: true},
+		{param: "urn:ciao:@!=%2C(xyz)+a,b.*@g=$_'", expected: true},
+		{param: "URN:hexes:%25", expected: true},
+		{param: "URN:x:abc%1Dz%2F%3az", expected: true},
+		{param: "URN:foo:a123,456", expected: true},
+		{param: "urn:foo:a123,456", expected: true},
+		{param: "urn:FOO:a123,456", expected: true},
+		{param: "urn:foo:A123,456", expected: true},
+		{param: "urn:foo:a123%2C456", expected: true},
+		{param: "URN:FOO:a123%2c456", expected: true},
+		{param: "URN:FOO:ABC%FFabc123%2c456", expected: true},
+		{param: "URN:FOO:ABC%FFabc123%2C456%9A", expected: true},
+		{param: "urn:ietf:params:scim:schemas:core:2.0:User", expected: true},
+		{param: "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:meta.lastModified", expected: true},
+		{param: "URN:-xxx:x", expected: false},
+		{param: "urn::colon:nss", expected: false},
+		{param: "urn:abcdefghilmnopqrstuvzabcdefghilmn:specificstring", expected: false},
+		{param: "URN:a!?:x", expected: false},
+		{param: "URN:#,:x", expected: false},
+		{param: "urn:urn:NSS", expected: false},
+		{param: "urn:URN:NSS", expected: false},
+		{param: "urn:white space:NSS", expected: false},
+		{param: "urn:concat:no spaces", expected: false},
+		{param: "urn:a:%", expected: false},
+		{param: "urn:", expected: false},
 	}
 
 	tag := "urn_rfc2141"
@@ -7986,7 +7942,6 @@ func TestUrnRFC2141(t *testing.T) {
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, tag)
 
 		if test.expected {
@@ -8014,48 +7969,47 @@ func TestUrl(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"http://foo.bar#com", true},
-		{"http://foobar.com", true},
-		{"https://foobar.com", true},
-		{"foobar.com", false},
-		{"http://foobar.coffee/", true},
-		{"http://foobar.中文网/", true},
-		{"http://foobar.org/", true},
-		{"http://foobar.org:8080/", true},
-		{"ftp://foobar.ru/", true},
-		{"http://user:pass@www.foobar.com/", true},
-		{"http://127.0.0.1/", true},
-		{"http://duckduckgo.com/?q=%2F", true},
-		{"http://localhost:3000/", true},
-		{"http://foobar.com/?foo=bar#baz=qux", true},
-		{"http://foobar.com?foo=bar", true},
-		{"http://www.xn--froschgrn-x9a.net/", true},
-		{"", false},
-		{"xyz://foobar.com", true},
-		{"invalid.", false},
-		{".com", false},
-		{"rtmp://foobar.com", true},
-		{"http://www.foo_bar.com/", true},
-		{"http://localhost:3000/", true},
-		{"http://foobar.com/#baz", true},
-		{"http://foobar.com#baz=qux", true},
-		{"http://foobar.com/t$-_.+!*\\'(),", true},
-		{"http://www.foobar.com/~foobar", true},
-		{"http://www.-foobar.com/", true},
-		{"http://www.foo---bar.com/", true},
-		{"mailto:someone@example.com", true},
-		{"irc://irc.server.org/channel", true},
-		{"irc://#channel@network", true},
-		{"/abs/test/dir", false},
-		{"./rel/test/dir", false},
-		{"irc:", false},
-		{"http://", false},
+		{param: "http://foo.bar#com", expected: true},
+		{param: "http://foobar.com", expected: true},
+		{param: "https://foobar.com", expected: true},
+		{param: "foobar.com", expected: false},
+		{param: "http://foobar.coffee/", expected: true},
+		{param: "http://foobar.中文网/", expected: true},
+		{param: "http://foobar.org/", expected: true},
+		{param: "http://foobar.org:8080/", expected: true},
+		{param: "ftp://foobar.ru/", expected: true},
+		{param: "http://user:pass@www.foobar.com/", expected: true},
+		{param: "http://127.0.0.1/", expected: true},
+		{param: "http://duckduckgo.com/?q=%2F", expected: true},
+		{param: "http://localhost:3000/", expected: true},
+		{param: "http://foobar.com/?foo=bar#baz=qux", expected: true},
+		{param: "http://foobar.com?foo=bar", expected: true},
+		{param: "http://www.xn--froschgrn-x9a.net/", expected: true},
+		{param: "", expected: false},
+		{param: "xyz://foobar.com", expected: true},
+		{param: "invalid.", expected: false},
+		{param: ".com", expected: false},
+		{param: "rtmp://foobar.com", expected: true},
+		{param: "http://www.foo_bar.com/", expected: true},
+		{param: "http://localhost:3000/", expected: true},
+		{param: "http://foobar.com/#baz", expected: true},
+		{param: "http://foobar.com#baz=qux", expected: true},
+		{param: "http://foobar.com/t$-_.+!*\\'(),", expected: true},
+		{param: "http://www.foobar.com/~foobar", expected: true},
+		{param: "http://www.-foobar.com/", expected: true},
+		{param: "http://www.foo---bar.com/", expected: true},
+		{param: "mailto:someone@example.com", expected: true},
+		{param: "irc://irc.server.org/channel", expected: true},
+		{param: "irc://#channel@network", expected: true},
+		{param: "/abs/test/dir", expected: false},
+		{param: "./rel/test/dir", expected: false},
+		{param: "irc:", expected: false},
+		{param: "http://", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "url")
 
 		if test.expected {
@@ -8083,54 +8037,53 @@ func TestHttpUrl(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"http://foo.bar#com", true},
-		{"http://foobar.com", true},
-		{"HTTP://foobar.com", true},
-		{"https://foobar.com", true},
-		{"foobar.com", false},
-		{"http://foobar.coffee/", true},
-		{"http://foobar.中文网/", true},
-		{"http://foobar.org/", true},
-		{"http://foobar.org:8080/", true},
-		{"ftp://foobar.ru/", false},
-		{"file:///etc/passwd", false},
-		{"file://C:/windows/win.ini", false},
-		{"http://user:pass@www.foobar.com/", true},
-		{"http://127.0.0.1/", true},
-		{"http://duckduckgo.com/?q=%2F", true},
-		{"http://localhost:3000/", true},
-		{"http://foobar.com/?foo=bar#baz=qux", true},
-		{"http://foobar.com?foo=bar", true},
-		{"http://www.xn--froschgrn-x9a.net/", true},
-		{"", false},
-		{"a://b", false},
-		{"xyz://foobar.com", false},
-		{"invalid.", false},
-		{".com", false},
-		{"rtmp://foobar.com", false},
-		{"http://www.foo_bar.com/", true},
-		{"http://localhost:3000/", true},
-		{"http://foobar.com/#baz", true},
-		{"http://foobar.com#baz=qux", true},
-		{"http://foobar.com/t$-_.+!*\\'(),", true},
-		{"http://www.foobar.com/~foobar", true},
-		{"http://www.-foobar.com/", true},
-		{"http://www.foo---bar.com/", true},
-		{"mailto:someone@example.com", false},
-		{"irc://irc.server.org/channel", false},
-		{"irc://#channel@network", false},
-		{"/abs/test/dir", false},
-		{"./rel/test/dir", false},
-		{"http:", false},
-		{"http://", false},
-		{"http://#invalid", false},
-		{"https://1.1.1.1", true},
+		{param: "http://foo.bar#com", expected: true},
+		{param: "http://foobar.com", expected: true},
+		{param: "HTTP://foobar.com", expected: true},
+		{param: "https://foobar.com", expected: true},
+		{param: "foobar.com", expected: false},
+		{param: "http://foobar.coffee/", expected: true},
+		{param: "http://foobar.中文网/", expected: true},
+		{param: "http://foobar.org/", expected: true},
+		{param: "http://foobar.org:8080/", expected: true},
+		{param: "ftp://foobar.ru/", expected: false},
+		{param: "file:///etc/passwd", expected: false},
+		{param: "file://C:/windows/win.ini", expected: false},
+		{param: "http://user:pass@www.foobar.com/", expected: true},
+		{param: "http://127.0.0.1/", expected: true},
+		{param: "http://duckduckgo.com/?q=%2F", expected: true},
+		{param: "http://localhost:3000/", expected: true},
+		{param: "http://foobar.com/?foo=bar#baz=qux", expected: true},
+		{param: "http://foobar.com?foo=bar", expected: true},
+		{param: "http://www.xn--froschgrn-x9a.net/", expected: true},
+		{param: "", expected: false},
+		{param: "a://b", expected: false},
+		{param: "xyz://foobar.com", expected: false},
+		{param: "invalid.", expected: false},
+		{param: ".com", expected: false},
+		{param: "rtmp://foobar.com", expected: false},
+		{param: "http://www.foo_bar.com/", expected: true},
+		{param: "http://localhost:3000/", expected: true},
+		{param: "http://foobar.com/#baz", expected: true},
+		{param: "http://foobar.com#baz=qux", expected: true},
+		{param: "http://foobar.com/t$-_.+!*\\'(),", expected: true},
+		{param: "http://www.foobar.com/~foobar", expected: true},
+		{param: "http://www.-foobar.com/", expected: true},
+		{param: "http://www.foo---bar.com/", expected: true},
+		{param: "mailto:someone@example.com", expected: false},
+		{param: "irc://irc.server.org/channel", expected: false},
+		{param: "irc://#channel@network", expected: false},
+		{param: "/abs/test/dir", expected: false},
+		{param: "./rel/test/dir", expected: false},
+		{param: "http:", expected: false},
+		{param: "http://", expected: false},
+		{param: "http://#invalid", expected: false},
+		{param: "https://1.1.1.1", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "http_url")
 
 		if test.expected {
@@ -8158,45 +8111,44 @@ func TestUri(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"http://foo.bar#com", true},
-		{"http://foobar.com", true},
-		{"https://foobar.com", true},
-		{"foobar.com", false},
-		{"http://foobar.coffee/", true},
-		{"http://foobar.中文网/", true},
-		{"http://foobar.org/", true},
-		{"http://foobar.org:8080/", true},
-		{"ftp://foobar.ru/", true},
-		{"http://user:pass@www.foobar.com/", true},
-		{"http://127.0.0.1/", true},
-		{"http://duckduckgo.com/?q=%2F", true},
-		{"http://localhost:3000/", true},
-		{"http://foobar.com/?foo=bar#baz=qux", true},
-		{"http://foobar.com?foo=bar", true},
-		{"http://www.xn--froschgrn-x9a.net/", true},
-		{"", false},
-		{"xyz://foobar.com", true},
-		{"invalid.", false},
-		{".com", false},
-		{"rtmp://foobar.com", true},
-		{"http://www.foo_bar.com/", true},
-		{"http://localhost:3000/", true},
-		{"http://foobar.com#baz=qux", true},
-		{"http://foobar.com/t$-_.+!*\\'(),", true},
-		{"http://www.foobar.com/~foobar", true},
-		{"http://www.-foobar.com/", true},
-		{"http://www.foo---bar.com/", true},
-		{"mailto:someone@example.com", true},
-		{"irc://irc.server.org/channel", true},
-		{"irc://#channel@network", true},
-		{"/abs/test/dir", true},
-		{"./rel/test/dir", false},
+		{param: "http://foo.bar#com", expected: true},
+		{param: "http://foobar.com", expected: true},
+		{param: "https://foobar.com", expected: true},
+		{param: "foobar.com", expected: false},
+		{param: "http://foobar.coffee/", expected: true},
+		{param: "http://foobar.中文网/", expected: true},
+		{param: "http://foobar.org/", expected: true},
+		{param: "http://foobar.org:8080/", expected: true},
+		{param: "ftp://foobar.ru/", expected: true},
+		{param: "http://user:pass@www.foobar.com/", expected: true},
+		{param: "http://127.0.0.1/", expected: true},
+		{param: "http://duckduckgo.com/?q=%2F", expected: true},
+		{param: "http://localhost:3000/", expected: true},
+		{param: "http://foobar.com/?foo=bar#baz=qux", expected: true},
+		{param: "http://foobar.com?foo=bar", expected: true},
+		{param: "http://www.xn--froschgrn-x9a.net/", expected: true},
+		{param: "", expected: false},
+		{param: "xyz://foobar.com", expected: true},
+		{param: "invalid.", expected: false},
+		{param: ".com", expected: false},
+		{param: "rtmp://foobar.com", expected: true},
+		{param: "http://www.foo_bar.com/", expected: true},
+		{param: "http://localhost:3000/", expected: true},
+		{param: "http://foobar.com#baz=qux", expected: true},
+		{param: "http://foobar.com/t$-_.+!*\\'(),", expected: true},
+		{param: "http://www.foobar.com/~foobar", expected: true},
+		{param: "http://www.-foobar.com/", expected: true},
+		{param: "http://www.foo---bar.com/", expected: true},
+		{param: "mailto:someone@example.com", expected: true},
+		{param: "irc://irc.server.org/channel", expected: true},
+		{param: "irc://#channel@network", expected: true},
+		{param: "/abs/test/dir", expected: true},
+		{param: "./rel/test/dir", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "uri")
 
 		if test.expected {
@@ -8662,6 +8614,7 @@ func TestNumeric(t *testing.T) {
 	errs = validate.Var(i, "numeric")
 	Equal(t, errs, nil)
 }
+
 func TestBoolean(t *testing.T) {
 	validate := New()
 
@@ -9157,7 +9110,7 @@ func TestPointerAndOmitEmpty(t *testing.T) {
 	Equal(t, errs, nil)
 
 	type TestIface struct {
-		MyInt interface{} `validate:"omitempty,gte=2,lte=255"`
+		MyInt any `validate:"omitempty,gte=2,lte=255"`
 	}
 
 	ti1 := TestIface{MyInt: &val1} // This should fail validation on gte because value is 0
@@ -9189,7 +9142,7 @@ func TestRequired(t *testing.T) {
 	})
 
 	type Test struct {
-		Value interface{} `validate:"required"`
+		Value any `validate:"required"`
 	}
 
 	var test Test
@@ -9265,7 +9218,7 @@ func TestTranslations(t *testing.T) {
 	Equal(t, err, nil)
 
 	type Test struct {
-		Value interface{} `validate:"required"`
+		Value any `validate:"required"`
 	}
 
 	var test Test
@@ -9424,8 +9377,8 @@ func TestStructFiltered(t *testing.T) {
 				Test      string `validate:"required"`
 				OtherTest string `validate:"required"`
 			}{
-				{"Required", "RequiredOther"},
-				{"Required", "RequiredOther"},
+				{Test: "Required", OtherTest: "RequiredOther"},
+				{Test: "Required", OtherTest: "RequiredOther"},
 			},
 		},
 	}
@@ -9612,23 +9565,22 @@ func TestAlphaUnicodeValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"abc", true},
-		{"this is a test string", false},
-		{"这是一个测试字符串", true},
-		{"123", false},
-		{"<>@;.-=", false},
-		{"ひらがな・カタカナ、．漢字", false},
-		{"あいうえおfoobar", true},
-		{"test＠example.com", false},
-		{"1234abcDE", false},
-		{"ｶﾀｶﾅ", true},
+		{param: "", expected: false},
+		{param: "abc", expected: true},
+		{param: "this is a test string", expected: false},
+		{param: "这是一个测试字符串", expected: true},
+		{param: "123", expected: false},
+		{param: "<>@;.-=", expected: false},
+		{param: "ひらがな・カタカナ、．漢字", expected: false},
+		{param: "あいうえおfoobar", expected: true},
+		{param: "test＠example.com", expected: false},
+		{param: "1234abcDE", expected: false},
+		{param: "ｶﾀｶﾅ", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "alphaunicode")
 
 		if test.expected {
@@ -9653,24 +9605,23 @@ func TestAlphanumericUnicodeValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"", false},
-		{"abc", true},
-		{"this is a test string", false},
-		{"这是一个测试字符串", true},
-		{"\u0031\u0032\u0033", true}, // unicode 5
-		{"123", true},
-		{"<>@;.-=", false},
-		{"ひらがな・カタカナ、．漢字", false},
-		{"あいうえおfoobar", true},
-		{"test＠example.com", false},
-		{"1234abcDE", true},
-		{"ｶﾀｶﾅ", true},
+		{param: "", expected: false},
+		{param: "abc", expected: true},
+		{param: "this is a test string", expected: false},
+		{param: "这是一个测试字符串", expected: true},
+		{param: "\u0031\u0032\u0033", expected: true}, // unicode 5
+		{param: "123", expected: true},
+		{param: "<>@;.-=", expected: false},
+		{param: "ひらがな・カタカナ、．漢字", expected: false},
+		{param: "あいうえおfoobar", expected: true},
+		{param: "test＠example.com", expected: false},
+		{param: "1234abcDE", expected: true},
+		{param: "ｶﾀｶﾅ", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "alphanumunicode")
 
 		if test.expected {
@@ -9708,7 +9659,7 @@ func TestArrayStructNamespace(t *testing.T) {
 	var input struct {
 		Children []child `json:"children" validate:"required,gt=0,dive"`
 	}
-	input.Children = []child{{"ok"}, {""}}
+	input.Children = []child{{Name: "ok"}, {Name: ""}}
 
 	errs := validate.Struct(input)
 	NotEqual(t, errs, nil)
@@ -9862,36 +9813,35 @@ func TestHostnameRFC952Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"test.example.com", true},
-		{"example.com", true},
-		{"example24.com", true},
-		{"test.example24.com", true},
-		{"test24.example24.com", true},
-		{"example", true},
-		{"EXAMPLE", true},
-		{"1.foo.com", false},
-		{"test.example.com.", false},
-		{"example.com.", false},
-		{"example24.com.", false},
-		{"test.example24.com.", false},
-		{"test24.example24.com.", false},
-		{"example.", false},
-		{"192.168.0.1", false},
-		{"email@example.com", false},
-		{"2001:cdba:0000:0000:0000:0000:3257:9652", false},
-		{"2001:cdba:0:0:0:0:3257:9652", false},
-		{"2001:cdba::3257:9652", false},
-		{"example..........com", false},
-		{"1234", false},
-		{"abc1234", true},
-		{"example. com", false},
-		{"ex ample.com", false},
+		{param: "test.example.com", expected: true},
+		{param: "example.com", expected: true},
+		{param: "example24.com", expected: true},
+		{param: "test.example24.com", expected: true},
+		{param: "test24.example24.com", expected: true},
+		{param: "example", expected: true},
+		{param: "EXAMPLE", expected: true},
+		{param: "1.foo.com", expected: false},
+		{param: "test.example.com.", expected: false},
+		{param: "example.com.", expected: false},
+		{param: "example24.com.", expected: false},
+		{param: "test.example24.com.", expected: false},
+		{param: "test24.example24.com.", expected: false},
+		{param: "example.", expected: false},
+		{param: "192.168.0.1", expected: false},
+		{param: "email@example.com", expected: false},
+		{param: "2001:cdba:0000:0000:0000:0000:3257:9652", expected: false},
+		{param: "2001:cdba:0:0:0:0:3257:9652", expected: false},
+		{param: "2001:cdba::3257:9652", expected: false},
+		{param: "example..........com", expected: false},
+		{param: "1234", expected: false},
+		{param: "abc1234", expected: true},
+		{param: "example. com", expected: false},
+		{param: "ex ample.com", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "hostname")
 
 		if test.expected {
@@ -9916,31 +9866,30 @@ func TestHostnameRFC1123Validation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"test.example.com", true},
-		{"example.com", true},
-		{"example24.com", true},
-		{"test.example24.com", true},
-		{"test24.example24.com", true},
-		{"example", true},
-		{"1.foo.com", true},
-		{"test.example.com.", false},
-		{"example.com.", false},
-		{"example24.com.", false},
-		{"test.example24.com.", false},
-		{"test24.example24.com.", false},
-		{"example.", false},
-		{"test_example", false},
-		{"192.168.0.1", true},
-		{"email@example.com", false},
-		{"2001:cdba:0000:0000:0000:0000:3257:9652", false},
-		{"2001:cdba:0:0:0:0:3257:9652", false},
-		{"2001:cdba::3257:9652", false},
+		{param: "test.example.com", expected: true},
+		{param: "example.com", expected: true},
+		{param: "example24.com", expected: true},
+		{param: "test.example24.com", expected: true},
+		{param: "test24.example24.com", expected: true},
+		{param: "example", expected: true},
+		{param: "1.foo.com", expected: true},
+		{param: "test.example.com.", expected: false},
+		{param: "example.com.", expected: false},
+		{param: "example24.com.", expected: false},
+		{param: "test.example24.com.", expected: false},
+		{param: "test24.example24.com.", expected: false},
+		{param: "example.", expected: false},
+		{param: "test_example", expected: false},
+		{param: "192.168.0.1", expected: true},
+		{param: "email@example.com", expected: false},
+		{param: "2001:cdba:0000:0000:0000:0000:3257:9652", expected: false},
+		{param: "2001:cdba:0:0:0:0:3257:9652", expected: false},
+		{param: "2001:cdba::3257:9652", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "hostname_rfc1123")
 
 		if test.expected {
@@ -9965,32 +9914,31 @@ func TestHostnameRFC1123AliasValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"test.example.com", true},
-		{"example.com", true},
-		{"example24.com", true},
-		{"test.example24.com", true},
-		{"test24.example24.com", true},
-		{"example", true},
-		{"1.foo.com", true},
-		{"test.example.com.", false},
-		{"example.com.", false},
-		{"example24.com.", false},
-		{"test.example24.com.", false},
-		{"test24.example24.com.", false},
-		{"example.", false},
-		{"test_example", false},
-		{"192.168.0.1", true},
-		{"email@example.com", false},
-		{"2001:cdba:0000:0000:0000:0000:3257:9652", false},
-		{"2001:cdba:0:0:0:0:3257:9652", false},
-		{"2001:cdba::3257:9652", false},
+		{param: "test.example.com", expected: true},
+		{param: "example.com", expected: true},
+		{param: "example24.com", expected: true},
+		{param: "test.example24.com", expected: true},
+		{param: "test24.example24.com", expected: true},
+		{param: "example", expected: true},
+		{param: "1.foo.com", expected: true},
+		{param: "test.example.com.", expected: false},
+		{param: "example.com.", expected: false},
+		{param: "example24.com.", expected: false},
+		{param: "test.example24.com.", expected: false},
+		{param: "test24.example24.com.", expected: false},
+		{param: "example.", expected: false},
+		{param: "test_example", expected: false},
+		{param: "192.168.0.1", expected: true},
+		{param: "email@example.com", expected: false},
+		{param: "2001:cdba:0000:0000:0000:0000:3257:9652", expected: false},
+		{param: "2001:cdba:0:0:0:0:3257:9652", expected: false},
+		{param: "2001:cdba::3257:9652", expected: false},
 	}
 
 	validate := New()
 	validate.RegisterAlias("hostname", "hostname_rfc1123")
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "hostname")
 
 		if test.expected {
@@ -10015,32 +9963,31 @@ func TestFQDNValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"test.example.com", true},
-		{"example.com", true},
-		{"example24.com", true},
-		{"test.example24.com", true},
-		{"test24.example24.com", true},
-		{"test.example.com.", true},
-		{"example.com.", true},
-		{"example24.com.", true},
-		{"test.example24.com.", true},
-		{"test24.example24.com.", true},
-		{"24.example24.com", true},
-		{"test.24.example.com", true},
-		{"test24.example24.com..", false},
-		{"example", false},
-		{"192.168.0.1", false},
-		{"email@example.com", false},
-		{"2001:cdba:0000:0000:0000:0000:3257:9652", false},
-		{"2001:cdba:0:0:0:0:3257:9652", false},
-		{"2001:cdba::3257:9652", false},
-		{"", false},
+		{param: "test.example.com", expected: true},
+		{param: "example.com", expected: true},
+		{param: "example24.com", expected: true},
+		{param: "test.example24.com", expected: true},
+		{param: "test24.example24.com", expected: true},
+		{param: "test.example.com.", expected: true},
+		{param: "example.com.", expected: true},
+		{param: "example24.com.", expected: true},
+		{param: "test.example24.com.", expected: true},
+		{param: "test24.example24.com.", expected: true},
+		{param: "24.example24.com", expected: true},
+		{param: "test.24.example.com", expected: true},
+		{param: "test24.example24.com..", expected: false},
+		{param: "example", expected: false},
+		{param: "192.168.0.1", expected: false},
+		{param: "email@example.com", expected: false},
+		{param: "2001:cdba:0000:0000:0000:0000:3257:9652", expected: false},
+		{param: "2001:cdba:0:0:0:0:3257:9652", expected: false},
+		{param: "2001:cdba::3257:9652", expected: false},
+		{param: "", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "fqdn")
 
 		if test.expected {
@@ -10117,66 +10064,65 @@ func TestIsDefault(t *testing.T) {
 
 func TestUniqueValidation(t *testing.T) {
 	tests := []struct {
-		param    interface{}
+		param    any
 		expected bool
 	}{
 		// Arrays
-		{[2]string{"a", "b"}, true},
-		{[2]int{1, 2}, true},
-		{[2]float64{1, 2}, true},
-		{[2]interface{}{"a", "b"}, true},
-		{[2]interface{}{"a", 1}, true},
-		{[2]float64{1, 1}, false},
-		{[2]int{1, 1}, false},
-		{[2]string{"a", "a"}, false},
-		{[2]interface{}{"a", "a"}, false},
-		{[4]interface{}{"a", 1, "b", 1}, false},
-		{[2]*string{stringPtr("a"), stringPtr("b")}, true},
-		{[2]*int{intPtr(1), intPtr(2)}, true},
-		{[2]*float64{float64Ptr(1), float64Ptr(2)}, true},
-		{[2]*string{stringPtr("a"), stringPtr("a")}, false},
-		{[2]*float64{float64Ptr(1), float64Ptr(1)}, false},
-		{[2]*int{intPtr(1), intPtr(1)}, false},
+		{param: [2]string{"a", "b"}, expected: true},
+		{param: [2]int{1, 2}, expected: true},
+		{param: [2]float64{1, 2}, expected: true},
+		{param: [2]any{"a", "b"}, expected: true},
+		{param: [2]any{"a", 1}, expected: true},
+		{param: [2]float64{1, 1}, expected: false},
+		{param: [2]int{1, 1}, expected: false},
+		{param: [2]string{"a", "a"}, expected: false},
+		{param: [2]any{"a", "a"}, expected: false},
+		{param: [4]any{"a", 1, "b", 1}, expected: false},
+		{param: [2]*string{stringPtr("a"), stringPtr("b")}, expected: true},
+		{param: [2]*int{intPtr(1), intPtr(2)}, expected: true},
+		{param: [2]*float64{float64Ptr(1), float64Ptr(2)}, expected: true},
+		{param: [2]*string{stringPtr("a"), stringPtr("a")}, expected: false},
+		{param: [2]*float64{float64Ptr(1), float64Ptr(1)}, expected: false},
+		{param: [2]*int{intPtr(1), intPtr(1)}, expected: false},
 		// Slices
-		{[]string{"a", "b"}, true},
-		{[]int{1, 2}, true},
-		{[]float64{1, 2}, true},
-		{[]interface{}{"a", "b"}, true},
-		{[]interface{}{"a", 1}, true},
-		{[]float64{1, 1}, false},
-		{[]int{1, 1}, false},
-		{[]string{"a", "a"}, false},
-		{[]interface{}{"a", "a"}, false},
-		{[]interface{}{"a", 1, "b", 1}, false},
-		{[]*string{stringPtr("a"), stringPtr("b")}, true},
-		{[]*int{intPtr(1), intPtr(2)}, true},
-		{[]*float64{float64Ptr(1), float64Ptr(2)}, true},
-		{[]*string{stringPtr("a"), stringPtr("a")}, false},
-		{[]*float64{float64Ptr(1), float64Ptr(1)}, false},
-		{[]*int{intPtr(1), intPtr(1)}, false},
+		{param: []string{"a", "b"}, expected: true},
+		{param: []int{1, 2}, expected: true},
+		{param: []float64{1, 2}, expected: true},
+		{param: []any{"a", "b"}, expected: true},
+		{param: []any{"a", 1}, expected: true},
+		{param: []float64{1, 1}, expected: false},
+		{param: []int{1, 1}, expected: false},
+		{param: []string{"a", "a"}, expected: false},
+		{param: []any{"a", "a"}, expected: false},
+		{param: []any{"a", 1, "b", 1}, expected: false},
+		{param: []*string{stringPtr("a"), stringPtr("b")}, expected: true},
+		{param: []*int{intPtr(1), intPtr(2)}, expected: true},
+		{param: []*float64{float64Ptr(1), float64Ptr(2)}, expected: true},
+		{param: []*string{stringPtr("a"), stringPtr("a")}, expected: false},
+		{param: []*float64{float64Ptr(1), float64Ptr(1)}, expected: false},
+		{param: []*int{intPtr(1), intPtr(1)}, expected: false},
 		// Maps
-		{map[string]string{"one": "a", "two": "b"}, true},
-		{map[string]int{"one": 1, "two": 2}, true},
-		{map[string]float64{"one": 1, "two": 2}, true},
-		{map[string]interface{}{"one": "a", "two": "b"}, true},
-		{map[string]interface{}{"one": "a", "two": 1}, true},
-		{map[string]float64{"one": 1, "two": 1}, false},
-		{map[string]int{"one": 1, "two": 1}, false},
-		{map[string]string{"one": "a", "two": "a"}, false},
-		{map[string]interface{}{"one": "a", "two": "a"}, false},
-		{map[string]interface{}{"one": "a", "two": 1, "three": "b", "four": 1}, false},
-		{map[string]*string{"one": stringPtr("a"), "two": stringPtr("a")}, false},
-		{map[string]*string{"one": stringPtr("a"), "two": stringPtr("b")}, true},
-		{map[string]*int{"one": intPtr(1), "two": intPtr(1)}, false},
-		{map[string]*int{"one": intPtr(1), "two": intPtr(2)}, true},
-		{map[string]*float64{"one": float64Ptr(1.1), "two": float64Ptr(1.1)}, false},
-		{map[string]*float64{"one": float64Ptr(1.1), "two": float64Ptr(1.2)}, true},
+		{param: map[string]string{"one": "a", "two": "b"}, expected: true},
+		{param: map[string]int{"one": 1, "two": 2}, expected: true},
+		{param: map[string]float64{"one": 1, "two": 2}, expected: true},
+		{param: map[string]any{"one": "a", "two": "b"}, expected: true},
+		{param: map[string]any{"one": "a", "two": 1}, expected: true},
+		{param: map[string]float64{"one": 1, "two": 1}, expected: false},
+		{param: map[string]int{"one": 1, "two": 1}, expected: false},
+		{param: map[string]string{"one": "a", "two": "a"}, expected: false},
+		{param: map[string]any{"one": "a", "two": "a"}, expected: false},
+		{param: map[string]any{"one": "a", "two": 1, "three": "b", "four": 1}, expected: false},
+		{param: map[string]*string{"one": stringPtr("a"), "two": stringPtr("a")}, expected: false},
+		{param: map[string]*string{"one": stringPtr("a"), "two": stringPtr("b")}, expected: true},
+		{param: map[string]*int{"one": intPtr(1), "two": intPtr(1)}, expected: false},
+		{param: map[string]*int{"one": intPtr(1), "two": intPtr(2)}, expected: true},
+		{param: map[string]*float64{"one": float64Ptr(1.1), "two": float64Ptr(1.1)}, expected: false},
+		{param: map[string]*float64{"one": float64Ptr(1.1), "two": float64Ptr(1.2)}, expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "unique")
 
 		if test.expected {
@@ -10198,17 +10144,17 @@ func TestUniqueValidation(t *testing.T) {
 
 	t.Run("struct", func(t *testing.T) {
 		tests := []struct {
-			param    interface{}
+			param    any
 			expected bool
 		}{
-			{struct {
+			{param: struct {
 				A string `validate:"unique=B"`
 				B string
-			}{A: "abc", B: "bcd"}, true},
-			{struct {
+			}{A: "abc", B: "bcd"}, expected: true},
+			{param: struct {
 				A string `validate:"unique=B"`
 				B string
-			}{A: "abc", B: "abc"}, false},
+			}{A: "abc", B: "abc"}, expected: false},
 		}
 		validate := New()
 
@@ -10242,19 +10188,18 @@ func TestUniqueValidationStructSlice(t *testing.T) {
 	}
 
 	tests := []struct {
-		target   interface{}
+		target   any
 		param    string
 		expected bool
 	}{
-		{testStructs, "unique", true},
-		{testStructs, "unique=A", false},
-		{testStructs, "unique=B", true},
+		{target: testStructs, param: "unique", expected: true},
+		{target: testStructs, param: "unique=A", expected: false},
+		{target: testStructs, param: "unique=B", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.target, test.param)
 
 		if test.expected {
@@ -10286,19 +10231,18 @@ func TestUniqueValidationStructPtrSlice(t *testing.T) {
 	}
 
 	tests := []struct {
-		target   interface{}
+		target   any
 		param    string
 		expected bool
 	}{
-		{testStructs, "unique", true},
-		{testStructs, "unique=A", false},
-		{testStructs, "unique=B", true},
+		{target: testStructs, param: "unique", expected: true},
+		{target: testStructs, param: "unique=A", expected: false},
+		{target: testStructs, param: "unique=B", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.target, test.param)
 
 		if test.expected {
@@ -10324,21 +10268,20 @@ func TestHTMLValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"<html>", true},
-		{"<script>", true},
-		{"<stillworks>", true},
-		{"</html", false},
-		{"</script>", true},
-		{"<//script>", false},
-		{"<123nonsense>", false},
-		{"test", false},
-		{"&example", false},
+		{param: "<html>", expected: true},
+		{param: "<script>", expected: true},
+		{param: "<stillworks>", expected: true},
+		{param: "</html", expected: false},
+		{param: "</script>", expected: true},
+		{param: "<//script>", expected: false},
+		{param: "<123nonsense>", expected: false},
+		{param: "test", expected: false},
+		{param: "&example", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "html")
 
 		if test.expected {
@@ -10363,28 +10306,27 @@ func TestHTMLEncodedValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"&#x3c;", true},
-		{"&#xaf;", true},
-		{"&#x00;", true},
-		{"&#xf0;", true},
-		{"&#x3c", true},
-		{"&#xaf", true},
-		{"&#x00", true},
-		{"&#xf0", true},
-		{"&#ab", true},
-		{"&lt;", true},
-		{"&gt;", true},
-		{"&quot;", true},
-		{"&amp;", true},
-		{"#x0a", false},
-		{"&x00", false},
-		{"&#x1z", false},
+		{param: "&#x3c;", expected: true},
+		{param: "&#xaf;", expected: true},
+		{param: "&#x00;", expected: true},
+		{param: "&#xf0;", expected: true},
+		{param: "&#x3c", expected: true},
+		{param: "&#xaf", expected: true},
+		{param: "&#x00", expected: true},
+		{param: "&#xf0", expected: true},
+		{param: "&#ab", expected: true},
+		{param: "&lt;", expected: true},
+		{param: "&gt;", expected: true},
+		{param: "&quot;", expected: true},
+		{param: "&amp;", expected: true},
+		{param: "#x0a", expected: false},
+		{param: "&x00", expected: false},
+		{param: "&#x1z", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "html_encoded")
 
 		if test.expected {
@@ -10409,23 +10351,22 @@ func TestURLEncodedValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"%20", true},
-		{"%af", true},
-		{"%ff", true},
-		{"<%az", false},
-		{"%test%", false},
-		{"a%b", false},
-		{"1%2", false},
-		{"%%a%%", false},
-		{"hello", true},
-		{"", true},
-		{"+", true},
+		{param: "%20", expected: true},
+		{param: "%af", expected: true},
+		{param: "%ff", expected: true},
+		{param: "<%az", expected: false},
+		{param: "%test%", expected: false},
+		{param: "a%b", expected: false},
+		{param: "1%2", expected: false},
+		{param: "%%a%%", expected: false},
+		{param: "hello", expected: true},
+		{param: "", expected: true},
+		{param: "+", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "url_encoded")
 
 		if test.expected {
@@ -10580,7 +10521,7 @@ func TestKeysCustomValidation(t *testing.T) {
 		"xxx": "",
 	}
 
-	err = validate.Struct(TestMapStructPtr{label})
+	err = validate.Struct(TestMapStructPtr{Label: label})
 	NotEqual(t, err, nil)
 
 	errs := err.(ValidationErrors)
@@ -10699,12 +10640,12 @@ func TestDirValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"existing dir", "testdata", true},
-		{"existing self dir", ".", true},
-		{"existing parent dir", "..", true},
-		{"empty dir", "", false},
-		{"missing dir", "non_existing_testdata", false},
-		{"a file not a directory", filepath.Join("testdata", "a.go"), false},
+		{title: "existing dir", param: "testdata", expected: true},
+		{title: "existing self dir", param: ".", expected: true},
+		{title: "existing parent dir", param: "..", expected: true},
+		{title: "empty dir", param: "", expected: false},
+		{title: "missing dir", param: "non_existing_testdata", expected: false},
+		{title: "a file not a directory", param: filepath.Join("testdata", "a.go"), expected: false},
 	}
 
 	for _, test := range tests {
@@ -10734,11 +10675,11 @@ func TestDirPathValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"empty dirpath", "", false},
-		{"valid dirpath - exists", "testdata", true},
-		{"valid dirpath - explicit", "testdatanoexist" + string(os.PathSeparator), true},
-		{"invalid dirpath", "testdata\000" + string(os.PathSeparator), false},
-		{"file, not a dirpath", filepath.Join("testdata", "a.go"), false},
+		{title: "empty dirpath", param: "", expected: false},
+		{title: "valid dirpath - exists", param: "testdata", expected: true},
+		{title: "valid dirpath - explicit", param: "testdatanoexist" + string(os.PathSeparator), expected: true},
+		{title: "invalid dirpath", param: "testdata\000" + string(os.PathSeparator), expected: false},
+		{title: "file, not a dirpath", param: filepath.Join("testdata", "a.go"), expected: false},
 	}
 
 	for _, test := range tests {
@@ -10827,7 +10768,7 @@ func TestRequiredIf(t *testing.T) {
 		Field1  string            `validate:"omitempty" json:"field_1"`
 		Field2  *string           `validate:"required_if=Field1 test" json:"field_2"`
 		Field3  map[string]string `validate:"required_if=Field2 test" json:"field_3"`
-		Field4  interface{}       `validate:"required_if=Field3 1" json:"field_4"`
+		Field4  any               `validate:"required_if=Field3 1" json:"field_4"`
 		Field5  int               `validate:"required_if=Inner.Field test" json:"field_5"`
 		Field6  uint              `validate:"required_if=Field5 1" json:"field_6"`
 		Field7  float32           `validate:"required_if=Field6 1" json:"field_7"`
@@ -10855,7 +10796,7 @@ func TestRequiredIf(t *testing.T) {
 		Field1  string            `validate:"omitempty" json:"field_1"`
 		Field2  *string           `validate:"required_if=Field1 test" json:"field_2"`
 		Field3  map[string]string `validate:"required_if=Field2 test" json:"field_3"`
-		Field4  interface{}       `validate:"required_if=Field2 test" json:"field_4"`
+		Field4  any               `validate:"required_if=Field2 test" json:"field_4"`
 		Field5  string            `validate:"required_if=Field3 1" json:"field_5"`
 		Field6  string            `validate:"required_if=Inner.Field test" json:"field_6"`
 		Field7  string            `validate:"required_if=Inner2.Field test" json:"field_7"`
@@ -10905,7 +10846,7 @@ func TestRequiredUnless(t *testing.T) {
 		Field1  string            `validate:"omitempty" json:"field_1"`
 		Field2  *string           `validate:"required_unless=Field1 test" json:"field_2"`
 		Field3  map[string]string `validate:"required_unless=Field2 test" json:"field_3"`
-		Field4  interface{}       `validate:"required_unless=Field3 1" json:"field_4"`
+		Field4  any               `validate:"required_unless=Field3 1" json:"field_4"`
 		Field5  int               `validate:"required_unless=Inner.Field test" json:"field_5"`
 		Field6  uint              `validate:"required_unless=Field5 2" json:"field_6"`
 		Field7  float32           `validate:"required_unless=Field6 0" json:"field_7"`
@@ -10936,7 +10877,7 @@ func TestRequiredUnless(t *testing.T) {
 		Field1  string            `validate:"omitempty" json:"field_1"`
 		Field2  *string           `validate:"required_unless=Field1 test" json:"field_2"`
 		Field3  map[string]string `validate:"required_unless=Field2 test" json:"field_3"`
-		Field4  interface{}       `validate:"required_unless=Field2 test" json:"field_4"`
+		Field4  any               `validate:"required_unless=Field2 test" json:"field_4"`
 		Field5  string            `validate:"required_unless=Field3 0" json:"field_5"`
 		Field6  string            `validate:"required_unless=Inner.Field test" json:"field_6"`
 		Field7  string            `validate:"required_unless=Inner2.Field test" json:"field_7"`
@@ -10990,7 +10931,7 @@ func TestSkipUnless(t *testing.T) {
 		Field1  string            `validate:"omitempty" json:"field_1"`
 		Field2  *string           `validate:"skip_unless=Field1 test" json:"field_2"`
 		Field3  map[string]string `validate:"skip_unless=Field2 test" json:"field_3"`
-		Field4  interface{}       `validate:"skip_unless=Field3 1" json:"field_4"`
+		Field4  any               `validate:"skip_unless=Field3 1" json:"field_4"`
 		Field5  int               `validate:"skip_unless=Inner.Field test" json:"field_5"`
 		Field6  uint              `validate:"skip_unless=Field5 2" json:"field_6"`
 		Field7  float32           `validate:"skip_unless=Field6 1" json:"field_7"`
@@ -11021,7 +10962,7 @@ func TestSkipUnless(t *testing.T) {
 		Field1  string            `validate:"omitempty" json:"field_1"`
 		Field2  *string           `validate:"skip_unless=Field1 test" json:"field_2"`
 		Field3  map[string]string `validate:"skip_unless=Field2 test" json:"field_3"`
-		Field4  interface{}       `validate:"skip_unless=Field2 test" json:"field_4"`
+		Field4  any               `validate:"skip_unless=Field2 test" json:"field_4"`
 		Field5  string            `validate:"skip_unless=Field3 0" json:"field_5"`
 		Field6  string            `validate:"skip_unless=Inner.Field test" json:"field_6"`
 		Field7  string            `validate:"skip_unless=Inner2.Field test" json:"field_7"`
@@ -11081,7 +11022,7 @@ func TestRequiredWith(t *testing.T) {
 		Field1  string            `validate:"omitempty" json:"field_1"`
 		Field2  *string           `validate:"required_with=Field1" json:"field_2"`
 		Field3  map[string]string `validate:"required_with=Field2" json:"field_3"`
-		Field4  interface{}       `validate:"required_with=Field3" json:"field_4"`
+		Field4  any               `validate:"required_with=Field3" json:"field_4"`
 		Field5  string            `validate:"required_with=Field" json:"field_5"`
 		Field6  Inner             `validate:"required_with=Field2" json:"field_6"`
 		Field7  *Inner            `validate:"required_with=Field2" json:"field_7"`
@@ -11108,7 +11049,7 @@ func TestRequiredWith(t *testing.T) {
 		Field1  string            `validate:"omitempty" json:"field_1"`
 		Field2  *string           `validate:"required_with=Field1" json:"field_2"`
 		Field3  map[string]string `validate:"required_with=Field2" json:"field_3"`
-		Field4  interface{}       `validate:"required_with=Field2" json:"field_4"`
+		Field4  any               `validate:"required_with=Field2" json:"field_4"`
 		Field5  string            `validate:"required_with=Field3" json:"field_5"`
 		Field6  string            `validate:"required_with=Inner.Field" json:"field_6"`
 		Field7  string            `validate:"required_with=Inner2.Field" json:"field_7"`
@@ -11146,7 +11087,7 @@ func TestExcludedWith(t *testing.T) {
 		Field1 string            `validate:"excluded_with=FieldE" json:"field_1"`
 		Field2 *string           `validate:"excluded_with=FieldE" json:"field_2"`
 		Field3 map[string]string `validate:"excluded_with=FieldE" json:"field_3"`
-		Field4 interface{}       `validate:"excluded_with=FieldE" json:"field_4"`
+		Field4 any               `validate:"excluded_with=FieldE" json:"field_4"`
 		Field5 string            `validate:"excluded_with=Inner.FieldE" json:"field_5"`
 		Field6 string            `validate:"excluded_with=Inner2.FieldE" json:"field_6"`
 		Field7 Inner             `validate:"excluded_with=FieldE" json:"field_7"`
@@ -11174,7 +11115,7 @@ func TestExcludedWith(t *testing.T) {
 		Field1 string            `validate:"excluded_with=Field" json:"field_1"`
 		Field2 *string           `validate:"excluded_with=Field" json:"field_2"`
 		Field3 map[string]string `validate:"excluded_with=Field" json:"field_3"`
-		Field4 interface{}       `validate:"excluded_with=Field" json:"field_4"`
+		Field4 any               `validate:"excluded_with=Field" json:"field_4"`
 		Field5 string            `validate:"excluded_with=Inner.Field" json:"field_5"`
 		Field6 string            `validate:"excluded_with=Inner2.Field" json:"field_6"`
 		Field7 Inner             `validate:"excluded_with=Field" json:"field_7"`
@@ -11210,7 +11151,7 @@ func TestExcludedWith(t *testing.T) {
 		Field1 string            `validate:"excluded_with=FieldE" json:"field_1"`
 		Field2 *string           `validate:"excluded_with=FieldE" json:"field_2"`
 		Field3 map[string]string `validate:"excluded_with=FieldE" json:"field_3"`
-		Field4 interface{}       `validate:"excluded_with=FieldE" json:"field_4"`
+		Field4 any               `validate:"excluded_with=FieldE" json:"field_4"`
 		Field5 string            `validate:"excluded_with=Inner.FieldE" json:"field_5"`
 		Field6 string            `validate:"excluded_with=Inner2.FieldE" json:"field_6"`
 		Field7 Inner             `validate:"excluded_with=FieldE" json:"field_7"`
@@ -11242,7 +11183,7 @@ func TestExcludedWithout(t *testing.T) {
 		Field1 string            `validate:"excluded_without=Field" json:"field_1"`
 		Field2 *string           `validate:"excluded_without=Field" json:"field_2"`
 		Field3 map[string]string `validate:"excluded_without=Field" json:"field_3"`
-		Field4 interface{}       `validate:"excluded_without=Field" json:"field_4"`
+		Field4 any               `validate:"excluded_without=Field" json:"field_4"`
 		Field5 string            `validate:"excluded_without=Inner.Field" json:"field_5"`
 		Field6 Inner             `validate:"excluded_without=Field" json:"field_6"`
 		Field7 *Inner            `validate:"excluded_without=Field" json:"field_7"`
@@ -11271,7 +11212,7 @@ func TestExcludedWithout(t *testing.T) {
 		Field1 string            `validate:"excluded_without=FieldE" json:"field_1"`
 		Field2 *string           `validate:"excluded_without=FieldE" json:"field_2"`
 		Field3 map[string]string `validate:"excluded_without=FieldE" json:"field_3"`
-		Field4 interface{}       `validate:"excluded_without=FieldE" json:"field_4"`
+		Field4 any               `validate:"excluded_without=FieldE" json:"field_4"`
 		Field5 string            `validate:"excluded_without=Inner.FieldE" json:"field_5"`
 		Field6 string            `validate:"excluded_without=Inner2.FieldE" json:"field_6"`
 		Field7 Inner             `validate:"excluded_without=FieldE" json:"field_7"`
@@ -11306,7 +11247,7 @@ func TestExcludedWithout(t *testing.T) {
 		Field1 string            `validate:"excluded_without=Field" json:"field_1"`
 		Field2 *string           `validate:"excluded_without=Field" json:"field_2"`
 		Field3 map[string]string `validate:"excluded_without=Field" json:"field_3"`
-		Field4 interface{}       `validate:"excluded_without=Field" json:"field_4"`
+		Field4 any               `validate:"excluded_without=Field" json:"field_4"`
 		Field5 string            `validate:"excluded_without=Inner.Field" json:"field_5"`
 		Field6 Inner             `validate:"excluded_without=Field" json:"field_6"`
 		Field7 *Inner            `validate:"excluded_without=Field" json:"field_7"`
@@ -11336,7 +11277,7 @@ func TestExcludedWithAll(t *testing.T) {
 		Field1 string            `validate:"excluded_with_all=FieldE Field" json:"field_1"`
 		Field2 *string           `validate:"excluded_with_all=FieldE Field" json:"field_2"`
 		Field3 map[string]string `validate:"excluded_with_all=FieldE Field" json:"field_3"`
-		Field4 interface{}       `validate:"excluded_with_all=FieldE Field" json:"field_4"`
+		Field4 any               `validate:"excluded_with_all=FieldE Field" json:"field_4"`
 		Field5 string            `validate:"excluded_with_all=Inner.FieldE" json:"field_5"`
 		Field6 string            `validate:"excluded_with_all=Inner2.FieldE" json:"field_6"`
 		Field7 Inner             `validate:"excluded_with_all=FieldE Field" json:"field_7"`
@@ -11367,7 +11308,7 @@ func TestExcludedWithAll(t *testing.T) {
 		Field1 string            `validate:"excluded_with_all=Field FieldE" json:"field_1"`
 		Field2 *string           `validate:"excluded_with_all=Field FieldE" json:"field_2"`
 		Field3 map[string]string `validate:"excluded_with_all=Field FieldE" json:"field_3"`
-		Field4 interface{}       `validate:"excluded_with_all=Field FieldE" json:"field_4"`
+		Field4 any               `validate:"excluded_with_all=Field FieldE" json:"field_4"`
 		Field5 string            `validate:"excluded_with_all=Inner.Field" json:"field_5"`
 		Field6 string            `validate:"excluded_with_all=Inner2.Field" json:"field_6"`
 		Field7 Inner             `validate:"excluded_with_all=Field FieldE" json:"field_7"`
@@ -11404,7 +11345,7 @@ func TestExcludedWithAll(t *testing.T) {
 		Field1 string            `validate:"excluded_with_all=FieldE Field" json:"field_1"`
 		Field2 *string           `validate:"excluded_with_all=FieldE Field" json:"field_2"`
 		Field3 map[string]string `validate:"excluded_with_all=FieldE Field" json:"field_3"`
-		Field4 interface{}       `validate:"excluded_with_all=FieldE Field" json:"field_4"`
+		Field4 any               `validate:"excluded_with_all=FieldE Field" json:"field_4"`
 		Field5 string            `validate:"excluded_with_all=Inner.FieldE" json:"field_5"`
 		Field6 string            `validate:"excluded_with_all=Inner2.FieldE" json:"field_6"`
 		Field7 Inner             `validate:"excluded_with_all=Field FieldE" json:"field_7"`
@@ -11437,7 +11378,7 @@ func TestExcludedWithoutAll(t *testing.T) {
 		Field1 string            `validate:"excluded_without_all=Field FieldE" json:"field_1"`
 		Field2 *string           `validate:"excluded_without_all=Field FieldE" json:"field_2"`
 		Field3 map[string]string `validate:"excluded_without_all=Field FieldE" json:"field_3"`
-		Field4 interface{}       `validate:"excluded_without_all=Field FieldE" json:"field_4"`
+		Field4 any               `validate:"excluded_without_all=Field FieldE" json:"field_4"`
 		Field5 string            `validate:"excluded_without_all=Inner.Field Inner2.Field" json:"field_5"`
 		Field6 Inner             `validate:"excluded_without_all=Field FieldE" json:"field_6"`
 		Field7 *Inner            `validate:"excluded_without_all=Field FieldE" json:"field_7"`
@@ -11467,7 +11408,7 @@ func TestExcludedWithoutAll(t *testing.T) {
 		Field1 string            `validate:"excluded_without_all=FieldE Field" json:"field_1"`
 		Field2 *string           `validate:"excluded_without_all=FieldE Field" json:"field_2"`
 		Field3 map[string]string `validate:"excluded_without_all=FieldE Field" json:"field_3"`
-		Field4 interface{}       `validate:"excluded_without_all=FieldE Field" json:"field_4"`
+		Field4 any               `validate:"excluded_without_all=FieldE Field" json:"field_4"`
 		Field5 string            `validate:"excluded_without_all=Inner.FieldE" json:"field_5"`
 		Field6 string            `validate:"excluded_without_all=Inner2.FieldE" json:"field_6"`
 		Field7 Inner             `validate:"excluded_without_all=Field FieldE" json:"field_7"`
@@ -11502,7 +11443,7 @@ func TestExcludedWithoutAll(t *testing.T) {
 		Field1 string            `validate:"excluded_without_all=Field FieldE" json:"field_1"`
 		Field2 *string           `validate:"excluded_without_all=Field FieldE" json:"field_2"`
 		Field3 map[string]string `validate:"excluded_without_all=Field FieldE" json:"field_3"`
-		Field4 interface{}       `validate:"excluded_without_all=Field FieldE" json:"field_4"`
+		Field4 any               `validate:"excluded_without_all=Field FieldE" json:"field_4"`
 		Field5 string            `validate:"excluded_without_all=Inner.Field Inner2.Field" json:"field_5"`
 		Field6 Inner             `validate:"excluded_without_all=Field FieldE" json:"field_6"`
 		Field7 *Inner            `validate:"excluded_without_all=Field FieldE" json:"field_7"`
@@ -11532,7 +11473,7 @@ func TestRequiredWithAll(t *testing.T) {
 		Field1  string            `validate:"omitempty" json:"field_1"`
 		Field2  *string           `validate:"required_with_all=Field1" json:"field_2"`
 		Field3  map[string]string `validate:"required_with_all=Field2" json:"field_3"`
-		Field4  interface{}       `validate:"required_with_all=Field3" json:"field_4"`
+		Field4  any               `validate:"required_with_all=Field3" json:"field_4"`
 		Field5  string            `validate:"required_with_all=Inner.Field" json:"field_5"`
 		Field6  Inner             `validate:"required_with_all=Field1 Field2" json:"field_6"`
 		Field7  *Inner            `validate:"required_with_all=Field1 Field2" json:"field_7"`
@@ -11560,7 +11501,7 @@ func TestRequiredWithAll(t *testing.T) {
 		Field1  string            `validate:"omitempty" json:"field_1"`
 		Field2  *string           `validate:"required_with_all=Field1" json:"field_2"`
 		Field3  map[string]string `validate:"required_with_all=Field2" json:"field_3"`
-		Field4  interface{}       `validate:"required_with_all=Field1 FieldE" json:"field_4"`
+		Field4  any               `validate:"required_with_all=Field1 FieldE" json:"field_4"`
 		Field5  string            `validate:"required_with_all=Inner.Field Field2" json:"field_5"`
 		Field6  string            `validate:"required_with_all=Inner2.Field Field2" json:"field_6"`
 		Field7  Inner             `validate:"required_with_all=Inner.Field Field2" json:"field_7"`
@@ -11592,7 +11533,7 @@ func TestRequiredWithout(t *testing.T) {
 		Field1 string            `validate:"omitempty" json:"field_1"`
 		Field2 *string           `validate:"required_without=Field1" json:"field_2"`
 		Field3 map[string]string `validate:"required_without=Field2" json:"field_3"`
-		Field4 interface{}       `validate:"required_without=Field3" json:"field_4"`
+		Field4 any               `validate:"required_without=Field3" json:"field_4"`
 		Field5 string            `validate:"required_without=Field3" json:"field_5"`
 		Field6 Inner             `validate:"required_without=Field1" json:"field_6"`
 		Field7 *Inner            `validate:"required_without=Field1" json:"field_7"`
@@ -11617,7 +11558,7 @@ func TestRequiredWithout(t *testing.T) {
 		Field1  string            `json:"field_1"`
 		Field2  *string           `validate:"required_without=Field1" json:"field_2"`
 		Field3  map[string]string `validate:"required_without=Field2" json:"field_3"`
-		Field4  interface{}       `validate:"required_without=Field3" json:"field_4"`
+		Field4  any               `validate:"required_without=Field3" json:"field_4"`
 		Field5  string            `validate:"required_without=Field3" json:"field_5"`
 		Field6  string            `validate:"required_without=Field1" json:"field_6"`
 		Field7  string            `validate:"required_without=Inner.Field" json:"field_7"`
@@ -11664,7 +11605,7 @@ func TestRequiredWithoutAll(t *testing.T) {
 		Field1 string            `validate:"omitempty" json:"field_1"`
 		Field2 *string           `validate:"required_without_all=Field1" json:"field_2"`
 		Field3 map[string]string `validate:"required_without_all=Field2" json:"field_3"`
-		Field4 interface{}       `validate:"required_without_all=Field3" json:"field_4"`
+		Field4 any               `validate:"required_without_all=Field3" json:"field_4"`
 		Field5 string            `validate:"required_without_all=Field3" json:"field_5"`
 		Field6 nested            `validate:"required_without_all=Field1" json:"field_6"`
 		Field7 *nested           `validate:"required_without_all=Field1" json:"field_7"`
@@ -11674,8 +11615,8 @@ func TestRequiredWithoutAll(t *testing.T) {
 		Field3: map[string]string{"key": "val"},
 		Field4: "test",
 		Field5: "test",
-		Field6: nested{"potato"},
-		Field7: &nested{"potato"},
+		Field6: nested{value: "potato"},
+		Field7: &nested{value: "potato"},
 	}
 
 	validate := New()
@@ -11687,7 +11628,7 @@ func TestRequiredWithoutAll(t *testing.T) {
 		Field1 string            `validate:"omitempty" json:"field_1"`
 		Field2 *string           `validate:"required_without_all=Field1" json:"field_2"`
 		Field3 map[string]string `validate:"required_without_all=Field2" json:"field_3"`
-		Field4 interface{}       `validate:"required_without_all=Field3" json:"field_4"`
+		Field4 any               `validate:"required_without_all=Field3" json:"field_4"`
 		Field5 string            `validate:"required_without_all=Field3" json:"field_5"`
 		Field6 string            `validate:"required_without_all=Field1 Field3" json:"field_6"`
 		Field7 nested            `validate:"required_without_all=Field1" json:"field_7"`
@@ -12065,57 +12006,56 @@ func TestGetTag(t *testing.T) {
 
 func TestJSONValidation(t *testing.T) {
 	tests := []struct {
-		param    interface{}
+		param    any
 		expected bool
 	}{
-		{`foo`, false},
-		{`}{`, false},
-		{`{]`, false},
-		{`{}`, true},
-		{`{"foo":"bar"}`, true},
-		{`{"foo":"bar","bar":{"baz":["qux"]}}`, true},
-		{`{"foo": 3 "bar": 4}`, false},
-		{`{"foo": 3 ,"bar": 4`, false},
-		{`{foo": 3, "bar": 4}`, false},
-		{`foo`, false},
-		{`1`, true},
-		{`true`, true},
-		{`null`, true},
-		{`"null"`, true},
-		{json.RawMessage(`foo`), false},
-		{json.RawMessage(`}{`), false},
-		{json.RawMessage(`{]`), false},
-		{json.RawMessage(`{}`), true},
-		{json.RawMessage(`{"foo":"bar"}`), true},
-		{json.RawMessage(`{"foo":"bar","bar":{"baz":["qux"]}}`), true},
-		{json.RawMessage(`{"foo": 3 "bar": 4}`), false},
-		{json.RawMessage(`{"foo": 3 ,"bar": 4`), false},
-		{json.RawMessage(`{foo": 3, "bar": 4}`), false},
-		{json.RawMessage(`foo`), false},
-		{json.RawMessage(`1`), true},
-		{json.RawMessage(`true`), true},
-		{json.RawMessage(`null`), true},
-		{json.RawMessage(`"null"`), true},
-		{[]byte(`foo`), false},
-		{[]byte(`}{`), false},
-		{[]byte(`{]`), false},
-		{[]byte(`{}`), true},
-		{[]byte(`{"foo":"bar"}`), true},
-		{[]byte(`{"foo":"bar","bar":{"baz":["qux"]}}`), true},
-		{[]byte(`{"foo": 3 "bar": 4}`), false},
-		{[]byte(`{"foo": 3 ,"bar": 4`), false},
-		{[]byte(`{foo": 3, "bar": 4}`), false},
-		{[]byte(`foo`), false},
-		{[]byte(`1`), true},
-		{[]byte(`true`), true},
-		{[]byte(`null`), true},
-		{[]byte(`"null"`), true},
+		{param: `foo`, expected: false},
+		{param: `}{`, expected: false},
+		{param: `{]`, expected: false},
+		{param: `{}`, expected: true},
+		{param: `{"foo":"bar"}`, expected: true},
+		{param: `{"foo":"bar","bar":{"baz":["qux"]}}`, expected: true},
+		{param: `{"foo": 3 "bar": 4}`, expected: false},
+		{param: `{"foo": 3 ,"bar": 4`, expected: false},
+		{param: `{foo": 3, "bar": 4}`, expected: false},
+		{param: `foo`, expected: false},
+		{param: `1`, expected: true},
+		{param: `true`, expected: true},
+		{param: `null`, expected: true},
+		{param: `"null"`, expected: true},
+		{param: json.RawMessage(`foo`), expected: false},
+		{param: json.RawMessage(`}{`), expected: false},
+		{param: json.RawMessage(`{]`), expected: false},
+		{param: json.RawMessage(`{}`), expected: true},
+		{param: json.RawMessage(`{"foo":"bar"}`), expected: true},
+		{param: json.RawMessage(`{"foo":"bar","bar":{"baz":["qux"]}}`), expected: true},
+		{param: json.RawMessage(`{"foo": 3 "bar": 4}`), expected: false},
+		{param: json.RawMessage(`{"foo": 3 ,"bar": 4`), expected: false},
+		{param: json.RawMessage(`{foo": 3, "bar": 4}`), expected: false},
+		{param: json.RawMessage(`foo`), expected: false},
+		{param: json.RawMessage(`1`), expected: true},
+		{param: json.RawMessage(`true`), expected: true},
+		{param: json.RawMessage(`null`), expected: true},
+		{param: json.RawMessage(`"null"`), expected: true},
+		{param: []byte(`foo`), expected: false},
+		{param: []byte(`}{`), expected: false},
+		{param: []byte(`{]`), expected: false},
+		{param: []byte(`{}`), expected: true},
+		{param: []byte(`{"foo":"bar"}`), expected: true},
+		{param: []byte(`{"foo":"bar","bar":{"baz":["qux"]}}`), expected: true},
+		{param: []byte(`{"foo": 3 "bar": 4}`), expected: false},
+		{param: []byte(`{"foo": 3 ,"bar": 4`), expected: false},
+		{param: []byte(`{foo": 3, "bar": 4}`), expected: false},
+		{param: []byte(`foo`), expected: false},
+		{param: []byte(`1`), expected: true},
+		{param: []byte(`true`), expected: true},
+		{param: []byte(`null`), expected: true},
+		{param: []byte(`"null"`), expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "json")
 
 		if test.expected {
@@ -12144,18 +12084,17 @@ func TestJWTValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{"eyJhbGciOiJIUzI1NiJ9.eyJuYW1lIjoiZ29waGVyIn0.O_bROM_szPq9qBql-XDHMranHwP48ODdoLICWzqBr_U", true},
-		{"acb123-_.def456-_.ghi789-_", true},
-		{"eyJhbGciOiJOT05FIn0.e30.", true},
-		{"eyJhbGciOiJOT05FIn0.e30.\n", false},
-		{"\x00.\x00.\x00", false},
-		{"", false},
+		{param: "eyJhbGciOiJIUzI1NiJ9.eyJuYW1lIjoiZ29waGVyIn0.O_bROM_szPq9qBql-XDHMranHwP48ODdoLICWzqBr_U", expected: true},
+		{param: "acb123-_.def456-_.ghi789-_", expected: true},
+		{param: "eyJhbGciOiJOT05FIn0.e30.", expected: true},
+		{param: "eyJhbGciOiJOT05FIn0.e30.\n", expected: false},
+		{param: "\x00.\x00.\x00", expected: false},
+		{param: "", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "jwt")
 
 		if test.expected {
@@ -12185,15 +12124,15 @@ func Test_hostnameport_validator(t *testing.T) {
 		expected bool
 	}
 	testData := []testInput{
-		{"bad..domain.name:234", false},
-		{"extra.dot.com.", false},
-		{"localhost:1234", true},
-		{"192.168.1.1:1234", true},
-		{":1234", true},
-		{"domain.com:1334", true},
-		{"this.domain.com:234", true},
-		{"domain:75000", false},
-		{"missing.port", false},
+		{data: "bad..domain.name:234", expected: false},
+		{data: "extra.dot.com.", expected: false},
+		{data: "localhost:1234", expected: true},
+		{data: "192.168.1.1:1234", expected: true},
+		{data: ":1234", expected: true},
+		{data: "domain.com:1334", expected: true},
+		{data: "this.domain.com:234", expected: true},
+		{data: "domain:75000", expected: false},
+		{data: "missing.port", expected: false},
 	}
 	for _, td := range testData {
 		h := Host{Addr: td.data}
@@ -12210,15 +12149,14 @@ func TestLowercaseValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{`abcdefg`, true},
-		{`Abcdefg`, false},
-		{"", false},
+		{param: `abcdefg`, expected: true},
+		{param: `Abcdefg`, expected: false},
+		{param: "", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "lowercase")
 
 		if test.expected {
@@ -12247,15 +12185,14 @@ func TestUppercaseValidation(t *testing.T) {
 		param    string
 		expected bool
 	}{
-		{`ABCDEFG`, true},
-		{`aBCDEFG`, false},
-		{"", false},
+		{param: `ABCDEFG`, expected: true},
+		{param: `aBCDEFG`, expected: false},
+		{param: "", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.param, "uppercase")
 
 		if test.expected {
@@ -12285,14 +12222,13 @@ func TestDatetimeValidation(t *testing.T) {
 		tag      string
 		expected bool
 	}{
-		{"2008-02-01", `datetime=2006-01-02`, true},
-		{"2008-Feb-01", `datetime=2006-01-02`, false},
+		{value: "2008-02-01", tag: `datetime=2006-01-02`, expected: true},
+		{value: "2008-Feb-01", tag: `datetime=2006-01-02`, expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.value, test.tag)
 
 		if test.expected {
@@ -12321,15 +12257,14 @@ func TestIsIso3166Alpha2Validation(t *testing.T) {
 		value    string `validate:"iso3166_1_alpha2"`
 		expected bool
 	}{
-		{"PL", true},
-		{"POL", false},
-		{"AA", false},
+		{value: "PL", expected: true},
+		{value: "POL", expected: false},
+		{value: "AA", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.value, "iso3166_1_alpha2")
 
 		if test.expected {
@@ -12349,15 +12284,14 @@ func TestIsIso31662Validation(t *testing.T) {
 		value    string `validate:"iso3166_2"`
 		expected bool
 	}{
-		{"US-FL", true},
-		{"US-F", false},
-		{"US", false},
+		{value: "US-FL", expected: true},
+		{value: "US-F", expected: false},
+		{value: "US", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.value, "iso3166_2")
 
 		if test.expected {
@@ -12377,15 +12311,14 @@ func TestIsIso3166Alpha3Validation(t *testing.T) {
 		value    string `validate:"iso3166_1_alpha3"`
 		expected bool
 	}{
-		{"POL", true},
-		{"PL", false},
-		{"AAA", false},
+		{value: "POL", expected: true},
+		{value: "PL", expected: false},
+		{value: "AAA", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.value, "iso3166_1_alpha3")
 
 		if test.expected {
@@ -12402,21 +12335,20 @@ func TestIsIso3166Alpha3Validation(t *testing.T) {
 
 func TestIsIso3166AlphaNumericValidation(t *testing.T) {
 	tests := []struct {
-		value    interface{}
+		value    any
 		expected bool
 	}{
-		{248, true},
-		{"248", true},
-		{0, false},
-		{1, false},
-		{"1", false},
-		{"invalid_int", false},
+		{value: 248, expected: true},
+		{value: "248", expected: true},
+		{value: 0, expected: false},
+		{value: 1, expected: false},
+		{value: "1", expected: false},
+		{value: "invalid_int", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.value, "iso3166_1_alpha_numeric")
 
 		if test.expected {
@@ -12437,23 +12369,22 @@ func TestIsIso3166AlphaNumericValidation(t *testing.T) {
 
 func TestCountryCodeValidation(t *testing.T) {
 	tests := []struct {
-		value    interface{}
+		value    any
 		expected bool
 	}{
-		{248, true},
-		{0, false},
-		{1, false},
-		{"POL", true},
-		{"NO", true},
-		{"248", true},
-		{"1", false},
-		{"0", false},
+		{value: 248, expected: true},
+		{value: 0, expected: false},
+		{value: 1, expected: false},
+		{value: "POL", expected: true},
+		{value: "NO", expected: true},
+		{value: "248", expected: true},
+		{value: "1", expected: false},
+		{value: "0", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.value, "country_code")
 
 		if test.expected {
@@ -12473,15 +12404,14 @@ func TestIsIso4217Validation(t *testing.T) {
 		value    string `validate:"iso4217"`
 		expected bool
 	}{
-		{"TRY", true},
-		{"EUR", true},
-		{"USA", false},
+		{value: "TRY", expected: true},
+		{value: "EUR", expected: true},
+		{value: "USA", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.value, "iso4217")
 
 		if test.expected {
@@ -12501,15 +12431,14 @@ func TestIsIso4217NumericValidation(t *testing.T) {
 		value    int `validate:"iso4217_numeric"`
 		expected bool
 	}{
-		{8, true},
-		{12, true},
-		{13, false},
+		{value: 8, expected: true},
+		{value: 12, expected: true},
+		{value: 13, expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.value, "iso4217_numeric")
 
 		if test.expected {
@@ -12531,17 +12460,16 @@ func TestTimeZoneValidation(t *testing.T) {
 		expected bool
 	}{
 		// systems may have different time zone database, some systems time zone are case insensitive
-		{"America/New_York", `timezone`, true},
-		{"UTC", `timezone`, true},
-		{"", `timezone`, false},
-		{"Local", `timezone`, false},
-		{"Unknown", `timezone`, false},
+		{value: "America/New_York", tag: `timezone`, expected: true},
+		{value: "UTC", tag: `timezone`, expected: true},
+		{value: "", tag: `timezone`, expected: false},
+		{value: "Local", tag: `timezone`, expected: false},
+		{value: "Unknown", tag: `timezone`, expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.value, test.tag)
 
 		if test.expected {
@@ -12568,7 +12496,7 @@ func TestTimeZoneValidation(t *testing.T) {
 func TestDurationType(t *testing.T) {
 	tests := []struct {
 		name    string
-		s       interface{} // struct
+		s       any // struct
 		success bool
 	}{
 		{
@@ -12614,20 +12542,19 @@ func TestBCP47LanguageTagValidation(t *testing.T) {
 		tag      string
 		expected bool
 	}{
-		{"en-US", "bcp47_language_tag", true},
-		{"en_GB", "bcp47_language_tag", true},
-		{"es", "bcp47_language_tag", true},
-		{"English", "bcp47_language_tag", false},
-		{"ESES", "bcp47_language_tag", false},
-		{"az-Cyrl-AZ", "bcp47_language_tag", true},
-		{"en-029", "bcp47_language_tag", true},
-		{"xog", "bcp47_language_tag", true},
+		{value: "en-US", tag: "bcp47_language_tag", expected: true},
+		{value: "en_GB", tag: "bcp47_language_tag", expected: true},
+		{value: "es", tag: "bcp47_language_tag", expected: true},
+		{value: "English", tag: "bcp47_language_tag", expected: false},
+		{value: "ESES", tag: "bcp47_language_tag", expected: false},
+		{value: "az-Cyrl-AZ", tag: "bcp47_language_tag", expected: true},
+		{value: "en-029", tag: "bcp47_language_tag", expected: true},
+		{value: "xog", tag: "bcp47_language_tag", expected: true},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.value, test.tag)
 
 		if test.expected {
@@ -12657,22 +12584,21 @@ func TestBicIsoFormatValidation(t *testing.T) {
 		tag      string
 		expected bool
 	}{
-		{"SBICKEN1345", "bic", true},
-		{"SBICKEN1", "bic", true},
-		{"SBICKENY", "bic", true},
-		{"SBICKEN1YYP", "bic", true},
-		{"SBIC23NXXX", "bic", false},
-		{"S23CKENXXXX", "bic", false},
-		{"SBICKENXX", "bic", false},
-		{"SBICKENXX9", "bic", false},
-		{"SBICKEN13458", "bic", false},
-		{"SBICKEN", "bic", false},
+		{value: "SBICKEN1345", tag: "bic", expected: true},
+		{value: "SBICKEN1", tag: "bic", expected: true},
+		{value: "SBICKENY", tag: "bic", expected: true},
+		{value: "SBICKEN1YYP", tag: "bic", expected: true},
+		{value: "SBIC23NXXX", tag: "bic", expected: false},
+		{value: "S23CKENXXXX", tag: "bic", expected: false},
+		{value: "SBICKENXX", tag: "bic", expected: false},
+		{value: "SBICKENXX9", tag: "bic", expected: false},
+		{value: "SBICKEN13458", tag: "bic", expected: false},
+		{value: "SBICKEN", tag: "bic", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.value, test.tag)
 
 		if test.expected {
@@ -12698,59 +12624,58 @@ func TestSemverFormatValidation(t *testing.T) {
 		tag      string
 		expected bool
 	}{
-		{"1.2.3", "semver", true},
-		{"10.20.30", "semver", true},
-		{"1.1.2-prerelease+meta", "semver", true},
-		{"1.1.2+meta", "semver", true},
-		{"1.1.2+meta-valid", "semver", true},
-		{"1.0.0-alpha", "semver", true},
-		{"1.0.0-alpha.1", "semver", true},
-		{"1.0.0-alpha.beta", "semver", true},
-		{"1.0.0-alpha.beta.1", "semver", true},
-		{"1.0.0-alpha0.valid", "semver", true},
-		{"1.0.0-alpha.0valid", "semver", true},
-		{"1.0.0-alpha-a.b-c-somethinglong+build.1-aef.1-its-okay", "semver", true},
-		{"1.0.0-rc.1+build.1", "semver", true},
-		{"1.0.0-rc.1+build.123", "semver", true},
-		{"1.2.3-beta", "semver", true},
-		{"1.2.3-DEV-SNAPSHOT", "semver", true},
-		{"1.2.3-SNAPSHOT-123", "semver", true},
-		{"2.0.0+build.1848", "semver", true},
-		{"2.0.1-alpha.1227", "semver", true},
-		{"1.0.0-alpha+beta", "semver", true},
-		{"1.2.3----RC-SNAPSHOT.12.9.1--.12+788", "semver", true},
-		{"1.2.3----R-S.12.9.1--.12+meta", "semver", true},
-		{"1.2.3----RC-SNAPSHOT.12.9.1--.12", "semver", true},
-		{"1.0.0+0.build.1-rc.10000aaa-kk-0.1", "semver", true},
-		{"99999999999999999999999.999999999999999999.99999999999999999", "semver", true},
-		{"1.0.0-0A.is.legal", "semver", true},
-		{"1", "semver", false},
-		{"1.2", "semver", false},
-		{"1.2.3-0123", "semver", false},
-		{"1.2.3-0123.0123", "semver", false},
-		{"1.1.2+.123", "semver", false},
-		{"+invalid", "semver", false},
-		{"-invalid", "semver", false},
-		{"-invalid+invalid", "semver", false},
-		{"alpha", "semver", false},
-		{"alpha.beta.1", "semver", false},
-		{"alpha.1", "semver", false},
-		{"1.0.0-alpha_beta", "semver", false},
-		{"1.0.0-alpha_beta", "semver", false},
-		{"1.0.0-alpha...1", "semver", false},
-		{"01.1.1", "semver", false},
-		{"1.01.1", "semver", false},
-		{"1.1.01", "semver", false},
-		{"1.2", "semver", false},
-		{"1.2.Dev", "semver", false},
-		{"1.2.3.Dev", "semver", false},
-		{"1.2-SNAPSHOT", "semver", false},
+		{value: "1.2.3", tag: "semver", expected: true},
+		{value: "10.20.30", tag: "semver", expected: true},
+		{value: "1.1.2-prerelease+meta", tag: "semver", expected: true},
+		{value: "1.1.2+meta", tag: "semver", expected: true},
+		{value: "1.1.2+meta-valid", tag: "semver", expected: true},
+		{value: "1.0.0-alpha", tag: "semver", expected: true},
+		{value: "1.0.0-alpha.1", tag: "semver", expected: true},
+		{value: "1.0.0-alpha.beta", tag: "semver", expected: true},
+		{value: "1.0.0-alpha.beta.1", tag: "semver", expected: true},
+		{value: "1.0.0-alpha0.valid", tag: "semver", expected: true},
+		{value: "1.0.0-alpha.0valid", tag: "semver", expected: true},
+		{value: "1.0.0-alpha-a.b-c-somethinglong+build.1-aef.1-its-okay", tag: "semver", expected: true},
+		{value: "1.0.0-rc.1+build.1", tag: "semver", expected: true},
+		{value: "1.0.0-rc.1+build.123", tag: "semver", expected: true},
+		{value: "1.2.3-beta", tag: "semver", expected: true},
+		{value: "1.2.3-DEV-SNAPSHOT", tag: "semver", expected: true},
+		{value: "1.2.3-SNAPSHOT-123", tag: "semver", expected: true},
+		{value: "2.0.0+build.1848", tag: "semver", expected: true},
+		{value: "2.0.1-alpha.1227", tag: "semver", expected: true},
+		{value: "1.0.0-alpha+beta", tag: "semver", expected: true},
+		{value: "1.2.3----RC-SNAPSHOT.12.9.1--.12+788", tag: "semver", expected: true},
+		{value: "1.2.3----R-S.12.9.1--.12+meta", tag: "semver", expected: true},
+		{value: "1.2.3----RC-SNAPSHOT.12.9.1--.12", tag: "semver", expected: true},
+		{value: "1.0.0+0.build.1-rc.10000aaa-kk-0.1", tag: "semver", expected: true},
+		{value: "99999999999999999999999.999999999999999999.99999999999999999", tag: "semver", expected: true},
+		{value: "1.0.0-0A.is.legal", tag: "semver", expected: true},
+		{value: "1", tag: "semver", expected: false},
+		{value: "1.2", tag: "semver", expected: false},
+		{value: "1.2.3-0123", tag: "semver", expected: false},
+		{value: "1.2.3-0123.0123", tag: "semver", expected: false},
+		{value: "1.1.2+.123", tag: "semver", expected: false},
+		{value: "+invalid", tag: "semver", expected: false},
+		{value: "-invalid", tag: "semver", expected: false},
+		{value: "-invalid+invalid", tag: "semver", expected: false},
+		{value: "alpha", tag: "semver", expected: false},
+		{value: "alpha.beta.1", tag: "semver", expected: false},
+		{value: "alpha.1", tag: "semver", expected: false},
+		{value: "1.0.0-alpha_beta", tag: "semver", expected: false},
+		{value: "1.0.0-alpha_beta", tag: "semver", expected: false},
+		{value: "1.0.0-alpha...1", tag: "semver", expected: false},
+		{value: "01.1.1", tag: "semver", expected: false},
+		{value: "1.01.1", tag: "semver", expected: false},
+		{value: "1.1.01", tag: "semver", expected: false},
+		{value: "1.2", tag: "semver", expected: false},
+		{value: "1.2.Dev", tag: "semver", expected: false},
+		{value: "1.2.3.Dev", tag: "semver", expected: false},
+		{value: "1.2-SNAPSHOT", tag: "semver", expected: false},
 	}
 
 	validate := New()
 
 	for i, test := range tests {
-
 		errs := validate.Var(test.value, test.tag)
 
 		if test.expected {
@@ -12771,25 +12696,24 @@ func TestSemverFormatValidation(t *testing.T) {
 }
 
 func TestCveFormatValidation(t *testing.T) {
-
 	tests := []struct {
 		value    string `validate:"cve"`
 		tag      string
 		expected bool
 	}{
-		{"CVE-1999-0001", "cve", true},
-		{"CVE-1998-0001", "cve", false},
-		{"CVE-2000-0001", "cve", true},
-		{"CVE-2222-0001", "cve", true},
-		{"2222-0001", "cve", false},
-		{"-2222-0001", "cve", false},
-		{"CVE22220001", "cve", false},
-		{"CVE-2222-000001", "cve", false},
-		{"CVE-2222-100001", "cve", true},
-		{"CVE-2222-99999999999", "cve", true},
-		{"CVE-3000-0001", "cve", false},
-		{"CVE-1999-0000", "cve", false},
-		{"CVE-2099-0000", "cve", false},
+		{value: "CVE-1999-0001", tag: "cve", expected: true},
+		{value: "CVE-1998-0001", tag: "cve", expected: false},
+		{value: "CVE-2000-0001", tag: "cve", expected: true},
+		{value: "CVE-2222-0001", tag: "cve", expected: true},
+		{value: "2222-0001", tag: "cve", expected: false},
+		{value: "-2222-0001", tag: "cve", expected: false},
+		{value: "CVE22220001", tag: "cve", expected: false},
+		{value: "CVE-2222-000001", tag: "cve", expected: false},
+		{value: "CVE-2222-100001", tag: "cve", expected: true},
+		{value: "CVE-2222-99999999999", tag: "cve", expected: true},
+		{value: "CVE-3000-0001", tag: "cve", expected: false},
+		{value: "CVE-1999-0000", tag: "cve", expected: false},
+		{value: "CVE-2099-0000", tag: "cve", expected: false},
 	}
 
 	validate := New()
@@ -12820,15 +12744,15 @@ func TestRFC1035LabelFormatValidation(t *testing.T) {
 		tag      string
 		expected bool
 	}{
-		{"abc", "dns_rfc1035_label", true},
-		{"abc-", "dns_rfc1035_label", false},
-		{"abc-123", "dns_rfc1035_label", true},
-		{"ABC", "dns_rfc1035_label", false},
-		{"ABC-123", "dns_rfc1035_label", false},
-		{"abc-abc", "dns_rfc1035_label", true},
-		{"ABC-ABC", "dns_rfc1035_label", false},
-		{"123-abc", "dns_rfc1035_label", false},
-		{"", "dns_rfc1035_label", false},
+		{value: "abc", tag: "dns_rfc1035_label", expected: true},
+		{value: "abc-", tag: "dns_rfc1035_label", expected: false},
+		{value: "abc-123", tag: "dns_rfc1035_label", expected: true},
+		{value: "ABC", tag: "dns_rfc1035_label", expected: false},
+		{value: "ABC-123", tag: "dns_rfc1035_label", expected: false},
+		{value: "abc-abc", tag: "dns_rfc1035_label", expected: true},
+		{value: "ABC-ABC", tag: "dns_rfc1035_label", expected: false},
+		{value: "123-abc", tag: "dns_rfc1035_label", expected: false},
+		{value: "", tag: "dns_rfc1035_label", expected: false},
 	}
 
 	validate := New()
@@ -12859,25 +12783,25 @@ func TestPostCodeByIso3166Alpha2(t *testing.T) {
 		expected bool
 	}{
 		"VN": {
-			{"ABC", false},
-			{"700000", true},
-			{"A1", false},
+			{value: "ABC", expected: false},
+			{value: "700000", expected: true},
+			{value: "A1", expected: false},
 		},
 		"GB": {
-			{"EC1A 1BB", true},
-			{"CF10 1B1H", false},
+			{value: "EC1A 1BB", expected: true},
+			{value: "CF10 1B1H", expected: false},
 		},
 		"VI": {
-			{"00803", true},
-			{"1234567", false},
+			{value: "00803", expected: true},
+			{value: "1234567", expected: false},
 		},
 		"LC": {
 			// not support regexp for post code
-			{"123456", false},
+			{value: "123456", expected: false},
 		},
 		"XX": {
 			// not support country
-			{"123456", false},
+			{value: "123456", expected: false},
 		},
 	}
 
@@ -12903,18 +12827,18 @@ func TestPostCodeByIso3166Alpha2(t *testing.T) {
 func TestPostCodeByIso3166Alpha2Field(t *testing.T) {
 	tests := []struct {
 		Value       string `validate:"postcode_iso3166_alpha2_field=CountryCode"`
-		CountryCode interface{}
+		CountryCode any
 		expected    bool
 	}{
-		{"ABC", "VN", false},
-		{"700000", "VN", true},
-		{"A1", "VN", false},
-		{"EC1A 1BB", "GB", true},
-		{"CF10 1B1H", "GB", false},
-		{"00803", "VI", true},
-		{"1234567", "VI", false},
-		{"123456", "LC", false}, // not support regexp for post code
-		{"123456", "XX", false}, // not support country
+		{Value: "ABC", CountryCode: "VN", expected: false},
+		{Value: "700000", CountryCode: "VN", expected: true},
+		{Value: "A1", CountryCode: "VN", expected: false},
+		{Value: "EC1A 1BB", CountryCode: "GB", expected: true},
+		{Value: "CF10 1B1H", CountryCode: "GB", expected: false},
+		{Value: "00803", CountryCode: "VI", expected: true},
+		{Value: "1234567", CountryCode: "VI", expected: false},
+		{Value: "123456", CountryCode: "LC", expected: false}, // not support regexp for post code
+		{Value: "123456", CountryCode: "XX", expected: false}, // not support country
 	}
 
 	validate := New()
@@ -12936,42 +12860,41 @@ func TestPostCodeByIso3166Alpha2Field(t *testing.T) {
 func TestPostCodeByIso3166Alpha2Field_WrongField(t *testing.T) {
 	type test struct {
 		Value        string `validate:"postcode_iso3166_alpha2_field=CountryCode"`
-		CountryCode1 interface{}
+		CountryCode1 any
 		expected     bool
 	}
 
-	errs := New().Struct(test{"ABC", "VN", false})
+	errs := New().Struct(test{Value: "ABC", CountryCode1: "VN", expected: false})
 	NotEqual(t, nil, errs)
 }
 
 func TestPostCodeByIso3166Alpha2Field_MissingParam(t *testing.T) {
 	type test struct {
 		Value        string `validate:"postcode_iso3166_alpha2_field="`
-		CountryCode1 interface{}
+		CountryCode1 any
 		expected     bool
 	}
 
-	errs := New().Struct(test{"ABC", "VN", false})
+	errs := New().Struct(test{Value: "ABC", CountryCode1: "VN", expected: false})
 	NotEqual(t, nil, errs)
 }
 
 func TestPostCodeByIso3166Alpha2Field_InvalidKind(t *testing.T) {
 	type test struct {
 		Value       string `validate:"postcode_iso3166_alpha2_field=CountryCode"`
-		CountryCode interface{}
+		CountryCode any
 		expected    bool
 	}
 	defer func() { _ = recover() }()
 
-	_ = New().Struct(test{"ABC", 123, false})
+	_ = New().Struct(test{Value: "ABC", CountryCode: 123, expected: false})
 	t.Errorf("Didn't panic as expected")
 }
 
 func TestValidate_ValidateMapCtx(t *testing.T) {
-
 	type args struct {
-		data  map[string]interface{}
-		rules map[string]interface{}
+		data  map[string]any
+		rules map[string]any
 	}
 	tests := []struct {
 		name string
@@ -12981,26 +12904,26 @@ func TestValidate_ValidateMapCtx(t *testing.T) {
 		{
 			name: "test nested map in slice",
 			args: args{
-				data: map[string]interface{}{
-					"Test_A": map[string]interface{}{
+				data: map[string]any{
+					"Test_A": map[string]any{
 						"Test_B": "Test_B",
-						"Test_C": []map[string]interface{}{
+						"Test_C": []map[string]any{
 							{
 								"Test_D": "Test_D",
 							},
 						},
-						"Test_E": map[string]interface{}{
+						"Test_E": map[string]any{
 							"Test_F": "Test_F",
 						},
 					},
 				},
-				rules: map[string]interface{}{
-					"Test_A": map[string]interface{}{
+				rules: map[string]any{
+					"Test_A": map[string]any{
 						"Test_B": "min=2",
-						"Test_C": map[string]interface{}{
+						"Test_C": map[string]any{
 							"Test_D": "min=2",
 						},
-						"Test_E": map[string]interface{}{
+						"Test_E": map[string]any{
 							"Test_F": "min=2",
 						},
 					},
@@ -13012,34 +12935,34 @@ func TestValidate_ValidateMapCtx(t *testing.T) {
 		{
 			name: "test nested map error",
 			args: args{
-				data: map[string]interface{}{
-					"Test_A": map[string]interface{}{
+				data: map[string]any{
+					"Test_A": map[string]any{
 						"Test_B": "Test_B",
-						"Test_C": []interface{}{"Test_D"},
-						"Test_E": map[string]interface{}{
+						"Test_C": []any{"Test_D"},
+						"Test_E": map[string]any{
 							"Test_F": "Test_F",
 						},
 						"Test_G": "Test_G",
-						"Test_I": []map[string]interface{}{
+						"Test_I": []map[string]any{
 							{
 								"Test_J": "Test_J",
 							},
 						},
 					},
 				},
-				rules: map[string]interface{}{
-					"Test_A": map[string]interface{}{
+				rules: map[string]any{
+					"Test_A": map[string]any{
 						"Test_B": "min=2",
-						"Test_C": map[string]interface{}{
+						"Test_C": map[string]any{
 							"Test_D": "min=2",
 						},
-						"Test_E": map[string]interface{}{
+						"Test_E": map[string]any{
 							"Test_F": "min=100",
 						},
-						"Test_G": map[string]interface{}{
+						"Test_G": map[string]any{
 							"Test_H": "min=2",
 						},
-						"Test_I": map[string]interface{}{
+						"Test_I": map[string]any{
 							"Test_J": "min=100",
 						},
 					},
@@ -13064,12 +12987,12 @@ func TestMongoDBObjectIDFormatValidation(t *testing.T) {
 		tag      string
 		expected bool
 	}{
-		{"507f191e810c19729de860ea", "mongodb", true},
-		{"507f191e810c19729de860eG", "mongodb", false},
-		{"M07f191e810c19729de860eG", "mongodb", false},
-		{"07f191e810c19729de860ea", "mongodb", false},
-		{"507f191e810c19729de860e", "mongodb", false},
-		{"507f191e810c19729de860ea4", "mongodb", false},
+		{value: "507f191e810c19729de860ea", tag: "mongodb", expected: true},
+		{value: "507f191e810c19729de860eG", tag: "mongodb", expected: false},
+		{value: "M07f191e810c19729de860eG", tag: "mongodb", expected: false},
+		{value: "07f191e810c19729de860ea", tag: "mongodb", expected: false},
+		{value: "507f191e810c19729de860e", tag: "mongodb", expected: false},
+		{value: "507f191e810c19729de860ea4", tag: "mongodb", expected: false},
 	}
 
 	validate := New()
@@ -13100,50 +13023,50 @@ func TestSpiceDBValueFormatValidation(t *testing.T) {
 		tag      string
 		expected bool
 	}{
-		//Must be an asterisk OR a string containing alphanumeric characters and a restricted set a special symbols: _ | / - = +
-		{"*", "spicedb=id", true},
-		{`azAZ09_|/-=+`, "spicedb=id", true},
-		{`a*`, "spicedb=id", false},
-		{`/`, "spicedb=id", true},
-		{"*", "spicedb", true},
+		// Must be an asterisk OR a string containing alphanumeric characters and a restricted set a special symbols: _ | / - = +
+		{value: "*", tag: "spicedb=id", expected: true},
+		{value: `azAZ09_|/-=+`, tag: "spicedb=id", expected: true},
+		{value: `a*`, tag: "spicedb=id", expected: false},
+		{value: `/`, tag: "spicedb=id", expected: true},
+		{value: "*", tag: "spicedb", expected: true},
 
-		//Must begin and end with a lowercase letter, may also contain numbers and underscores between, min length 3, max length 64
-		{"a", "spicedb=permission", false},
-		{"1", "spicedb=permission", false},
-		{"a1", "spicedb=permission", false},
-		{"a_b", "spicedb=permission", true},
-		{"A_b", "spicedb=permission", false},
-		{"a_B", "spicedb=permission", false},
-		{"abcdefghijklmnopqrstuvwxyz_0123456789_abcdefghijklmnopqrstuvwxyz", "spicedb=permission", true},
-		{"abcdefghijklmnopqrstuvwxyz_01234_56789_abcdefghijklmnopqrstuvwxyz", "spicedb=permission", false},
+		// Must begin and end with a lowercase letter, may also contain numbers and underscores between, min length 3, max length 64
+		{value: "a", tag: "spicedb=permission", expected: false},
+		{value: "1", tag: "spicedb=permission", expected: false},
+		{value: "a1", tag: "spicedb=permission", expected: false},
+		{value: "a_b", tag: "spicedb=permission", expected: true},
+		{value: "A_b", tag: "spicedb=permission", expected: false},
+		{value: "a_B", tag: "spicedb=permission", expected: false},
+		{value: "abcdefghijklmnopqrstuvwxyz_0123456789_abcdefghijklmnopqrstuvwxyz", tag: "spicedb=permission", expected: true},
+		{value: "abcdefghijklmnopqrstuvwxyz_01234_56789_abcdefghijklmnopqrstuvwxyz", tag: "spicedb=permission", expected: false},
 
-		//Object types follow the same rules as permissions for the type name plus an optional prefix up to 63 characters with a /
-		{"a", "spicedb=type", false},
-		{"1", "spicedb=type", false},
-		{"a1", "spicedb=type", false},
-		{"a_b", "spicedb=type", true},
-		{"A_b", "spicedb=type", false},
-		{"a_B", "spicedb=type", false},
-		{"abcdefghijklmnopqrstuvwxyz_0123456789_abcdefghijklmnopqrstuvwxyz", "spicedb=type", true},
-		{"abcdefghijklmnopqrstuvwxyz_01234_56789_abcdefghijklmnopqrstuvwxyz", "spicedb=type", false},
+		// Object types follow the same rules as permissions for the type name plus an optional prefix up to 63 characters with a /
+		{value: "a", tag: "spicedb=type", expected: false},
+		{value: "1", tag: "spicedb=type", expected: false},
+		{value: "a1", tag: "spicedb=type", expected: false},
+		{value: "a_b", tag: "spicedb=type", expected: true},
+		{value: "A_b", tag: "spicedb=type", expected: false},
+		{value: "a_B", tag: "spicedb=type", expected: false},
+		{value: "abcdefghijklmnopqrstuvwxyz_0123456789_abcdefghijklmnopqrstuvwxyz", tag: "spicedb=type", expected: true},
+		{value: "abcdefghijklmnopqrstuvwxyz_01234_56789_abcdefghijklmnopqrstuvwxyz", tag: "spicedb=type", expected: false},
 
-		{`a_b/a`, "spicedb=type", false},
-		{`a_b/1`, "spicedb=type", false},
-		{`a_b/a1`, "spicedb=type", false},
-		{`a_b/a_b`, "spicedb=type", true},
-		{`a_b/A_b`, "spicedb=type", false},
-		{`a_b/a_B`, "spicedb=type", false},
-		{`a_b/abcdefghijklmnopqrstuvwxyz_0123456789_abcdefghijklmnopqrstuvwxyz`, "spicedb=type", true},
-		{`a_b/abcdefghijklmnopqrstuvwxyz_01234_56789_abcdefghijklmnopqrstuvwxyz`, "spicedb=type", false},
+		{value: `a_b/a`, tag: "spicedb=type", expected: false},
+		{value: `a_b/1`, tag: "spicedb=type", expected: false},
+		{value: `a_b/a1`, tag: "spicedb=type", expected: false},
+		{value: `a_b/a_b`, tag: "spicedb=type", expected: true},
+		{value: `a_b/A_b`, tag: "spicedb=type", expected: false},
+		{value: `a_b/a_B`, tag: "spicedb=type", expected: false},
+		{value: `a_b/abcdefghijklmnopqrstuvwxyz_0123456789_abcdefghijklmnopqrstuvwxyz`, tag: "spicedb=type", expected: true},
+		{value: `a_b/abcdefghijklmnopqrstuvwxyz_01234_56789_abcdefghijklmnopqrstuvwxyz`, tag: "spicedb=type", expected: false},
 
-		{`a/a_b`, "spicedb=type", false},
-		{`1/a_b`, "spicedb=type", false},
-		{`a1/a_b`, "spicedb=type", false},
-		{`a_b/a_b`, "spicedb=type", true},
-		{`A_b/a_b`, "spicedb=type", false},
-		{`a_B/a_b`, "spicedb=type", false},
-		{`abcdefghijklmnopqrstuvwxyz_0123456789_abcdefghijklmnopqrstuvwxy/a_b`, "spicedb=type", true},
-		{`abcdefghijklmnopqrstuvwxyz_0123456789_abcdefghijklmnopqrstuvwxyz/a_b`, "spicedb=type", false},
+		{value: `a/a_b`, tag: "spicedb=type", expected: false},
+		{value: `1/a_b`, tag: "spicedb=type", expected: false},
+		{value: `a1/a_b`, tag: "spicedb=type", expected: false},
+		{value: `a_b/a_b`, tag: "spicedb=type", expected: true},
+		{value: `A_b/a_b`, tag: "spicedb=type", expected: false},
+		{value: `a_B/a_b`, tag: "spicedb=type", expected: false},
+		{value: `abcdefghijklmnopqrstuvwxyz_0123456789_abcdefghijklmnopqrstuvwxy/a_b`, tag: "spicedb=type", expected: true},
+		{value: `abcdefghijklmnopqrstuvwxyz_0123456789_abcdefghijklmnopqrstuvwxyz/a_b`, tag: "spicedb=type", expected: false},
 	}
 
 	validate := New()
@@ -13174,16 +13097,16 @@ func TestCreditCardFormatValidation(t *testing.T) {
 		tag      string
 		expected bool
 	}{
-		{"586824160825533338", "credit_card", true},
-		{"586824160825533328", "credit_card", false},
-		{"4624748233249780", "credit_card", true},
-		{"4624748233349780", "credit_card", false},
-		{"378282246310005", "credit_card", true},
-		{"378282146310005", "credit_card", false},
-		{"4624 7482 3324 9780", "credit_card", true},
-		{"4624 7482 3324  9780", "credit_card", false},
-		{"4624 7482 3324 978A", "credit_card", false},
-		{"4624 7482 332", "credit_card", false},
+		{value: "586824160825533338", tag: "credit_card", expected: true},
+		{value: "586824160825533328", tag: "credit_card", expected: false},
+		{value: "4624748233249780", tag: "credit_card", expected: true},
+		{value: "4624748233349780", tag: "credit_card", expected: false},
+		{value: "378282246310005", tag: "credit_card", expected: true},
+		{value: "378282146310005", tag: "credit_card", expected: false},
+		{value: "4624 7482 3324 9780", tag: "credit_card", expected: true},
+		{value: "4624 7482 3324  9780", tag: "credit_card", expected: false},
+		{value: "4624 7482 3324 978A", tag: "credit_card", expected: false},
+		{value: "4624 7482 332", tag: "credit_card", expected: false},
 	}
 
 	validate := New()
@@ -13210,26 +13133,26 @@ func TestCreditCardFormatValidation(t *testing.T) {
 
 func TestLuhnChecksumValidation(t *testing.T) {
 	testsUint := []struct {
-		value    interface{} `validate:"luhn_checksum"` // the type is interface{} because the luhn_checksum works on both strings and numbers
+		value    any `validate:"luhn_checksum"` // the type is interface{} because the luhn_checksum works on both strings and numbers
 		tag      string
 		expected bool
 	}{
-		{uint64(586824160825533338), "luhn_checksum", true}, // credit card numbers are just special cases of numbers with luhn checksum
-		{586824160825533338, "luhn_checksum", true},
-		{"586824160825533338", "luhn_checksum", true},
-		{uint64(586824160825533328), "luhn_checksum", false},
-		{586824160825533328, "luhn_checksum", false},
-		{"586824160825533328", "luhn_checksum", false},
-		{10000000116, "luhn_checksum", true}, // but there may be shorter numbers (11 digits)
-		{"10000000116", "luhn_checksum", true},
-		{10000000117, "luhn_checksum", false},
-		{"10000000117", "luhn_checksum", false},
-		{uint64(12345678123456789011), "luhn_checksum", true}, // or longer numbers (19 digits)
-		{"12345678123456789011", "luhn_checksum", true},
-		{1, "luhn_checksum", false}, // single digits (checksum only) are not allowed
-		{"1", "luhn_checksum", false},
-		{-10, "luhn_checksum", false}, // negative ints are not allowed
-		{"abcdefghijklmnop", "luhn_checksum", false},
+		{value: uint64(586824160825533338), tag: "luhn_checksum", expected: true}, // credit card numbers are just special cases of numbers with luhn checksum
+		{value: 586824160825533338, tag: "luhn_checksum", expected: true},
+		{value: "586824160825533338", tag: "luhn_checksum", expected: true},
+		{value: uint64(586824160825533328), tag: "luhn_checksum", expected: false},
+		{value: 586824160825533328, tag: "luhn_checksum", expected: false},
+		{value: "586824160825533328", tag: "luhn_checksum", expected: false},
+		{value: 10000000116, tag: "luhn_checksum", expected: true}, // but there may be shorter numbers (11 digits)
+		{value: "10000000116", tag: "luhn_checksum", expected: true},
+		{value: 10000000117, tag: "luhn_checksum", expected: false},
+		{value: "10000000117", tag: "luhn_checksum", expected: false},
+		{value: uint64(12345678123456789011), tag: "luhn_checksum", expected: true}, // or longer numbers (19 digits)
+		{value: "12345678123456789011", tag: "luhn_checksum", expected: true},
+		{value: 1, tag: "luhn_checksum", expected: false}, // single digits (checksum only) are not allowed
+		{value: "1", tag: "luhn_checksum", expected: false},
+		{value: -10, tag: "luhn_checksum", expected: false}, // negative ints are not allowed
+		{value: "abcdefghijklmnop", tag: "luhn_checksum", expected: false},
 	}
 
 	validate := New()
@@ -13258,7 +13181,7 @@ func TestMultiOrOperatorGroup(t *testing.T) {
 		Value    int `validate:"eq=1|gte=5,eq=1|lt=7"`
 		expected bool
 	}{
-		{1, true}, {2, false}, {5, true}, {6, true}, {8, false},
+		{Value: 1, expected: true}, {Value: 2, expected: false}, {Value: 5, expected: true}, {Value: 6, expected: true}, {Value: 8, expected: false},
 	}
 
 	validate := New()
@@ -13283,16 +13206,16 @@ func TestCronExpressionValidation(t *testing.T) {
 		tag      string
 		expected bool
 	}{
-		{"0 0 12 * * ?", "cron", true},
-		{"0 15 10 ? * *", "cron", true},
-		{"0 15 10 * * ?", "cron", true},
-		{"0 15 10 * * ? 2005", "cron", true},
-		{"0 15 10 ? * 6L", "cron", true},
-		{"0 15 10 ? * 6L 2002-2005", "cron", true},
-		{"*/20 * * * *", "cron", true},
-		{"0 15 10 ? * MON-FRI", "cron", true},
-		{"0 15 10 ? * 6#3", "cron", true},
-		{"wrong", "cron", false},
+		{value: "0 0 12 * * ?", tag: "cron", expected: true},
+		{value: "0 15 10 ? * *", tag: "cron", expected: true},
+		{value: "0 15 10 * * ?", tag: "cron", expected: true},
+		{value: "0 15 10 * * ? 2005", tag: "cron", expected: true},
+		{value: "0 15 10 ? * 6L", tag: "cron", expected: true},
+		{value: "0 15 10 ? * 6L 2002-2005", tag: "cron", expected: true},
+		{value: "*/20 * * * *", tag: "cron", expected: true},
+		{value: "0 15 10 ? * MON-FRI", tag: "cron", expected: true},
+		{value: "0 15 10 ? * 6#3", tag: "cron", expected: true},
+		{value: "wrong", tag: "cron", expected: false},
 	}
 
 	validate := New()
@@ -13332,7 +13255,7 @@ func TestNestedStructValidation(t *testing.T) {
 		Equal(t, 1, len(validationErrs))
 		AssertError(t, validationErrs, "topLevel.Nested", "topLevel.Nested", "Nested", "Nested", "required")
 
-		Equal(t, validator.Struct(topLevel{value{"potato"}}), nil)
+		Equal(t, validator.Struct(topLevel{Nested: value{Field: "potato"}}), nil)
 	})
 
 	t.Run("omitempty", func(t *testing.T) {
@@ -13360,13 +13283,13 @@ func TestNestedStructValidation(t *testing.T) {
 			}
 		)
 
-		errs := validator.Struct(topLevel{Field: "test", Nested: value{"potato"}})
+		errs := validator.Struct(topLevel{Field: "test", Nested: value{Field: "potato"}})
 		Equal(t, errs, nil)
 
 		errs = validator.Struct(topLevel{Field: "potato"})
 		Equal(t, errs, nil)
 
-		errs = validator.Struct(topLevel{Field: "potato", Nested: value{"potato"}})
+		errs = validator.Struct(topLevel{Field: "potato", Nested: value{Field: "potato"}})
 		AssertError(t, errs, "topLevel.Nested", "topLevel.Nested", "Nested", "Nested", "excluded_if")
 	})
 
@@ -13384,10 +13307,10 @@ func TestNestedStructValidation(t *testing.T) {
 		errs := validator.Struct(topLevel{Field: "test"})
 		Equal(t, errs, nil)
 
-		errs = validator.Struct(topLevel{Field: "potato", Nested: value{"potato"}})
+		errs = validator.Struct(topLevel{Field: "potato", Nested: value{Field: "potato"}})
 		Equal(t, errs, nil)
 
-		errs = validator.Struct(topLevel{Field: "test", Nested: value{"potato"}})
+		errs = validator.Struct(topLevel{Field: "test", Nested: value{Field: "potato"}})
 		AssertError(t, errs, "topLevel.Nested", "topLevel.Nested", "Nested", "Nested", "excluded_unless")
 	})
 
@@ -13401,7 +13324,7 @@ func TestNestedStructValidation(t *testing.T) {
 			}
 		)
 
-		errs := validator.Struct(topLevel{value{[]string{}}})
+		errs := validator.Struct(topLevel{Nested: value{Field: []string{}}})
 		Equal(t, errs, nil)
 	})
 
@@ -13434,19 +13357,19 @@ func TestNestedStructValidation(t *testing.T) {
 	tests := []test{
 		{
 			name:  "valid",
-			value: veggyBasket{"potato", "zucchini"},
+			value: veggyBasket{Root: "potato", Squash: "zucchini"},
 		}, {
 			name:  "failedCustomTag",
-			value: veggyBasket{"zucchini", "potato"},
-			err:   testErr{"topLevel.VeggyBasket", "veggy"},
+			value: veggyBasket{Root: "zucchini", Squash: "potato"},
+			err:   testErr{path: "topLevel.VeggyBasket", tag: "veggy"},
 		}, {
 			name:  "failedInnerField",
-			value: veggyBasket{"potato", ""},
-			err:   testErr{"topLevel.VeggyBasket.Squash", "required"},
+			value: veggyBasket{Root: "potato", Squash: ""},
+			err:   testErr{path: "topLevel.VeggyBasket.Squash", tag: "required"},
 		}, {
 			name:  "customTagFailurePriorityCheck",
-			value: veggyBasket{"zucchini", ""},
-			err:   testErr{"topLevel.VeggyBasket", "veggy"},
+			value: veggyBasket{Root: "zucchini", Squash: ""},
+			err:   testErr{path: "topLevel.VeggyBasket", tag: "veggy"},
 		},
 	}
 
@@ -13472,7 +13395,7 @@ func TestNestedStructValidation(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
-			evaluateTest(tt, validator.Struct(topLevel{tt.value}))
+			evaluateTest(tt, validator.Struct(topLevel{VeggyBasket: tt.value}))
 		})
 	}
 
@@ -13483,7 +13406,7 @@ func TestNestedStructValidation(t *testing.T) {
 		}
 
 		t.Run(tt.name+"Ptr", func(t *testing.T) {
-			evaluateTest(tt, validator.Struct(topLevel{&tt.value}))
+			evaluateTest(tt, validator.Struct(topLevel{VeggyBasket: &tt.value}))
 		})
 	}
 }

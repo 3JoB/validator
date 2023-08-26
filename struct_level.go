@@ -2,7 +2,8 @@ package validator
 
 import (
 	"context"
-	"reflect"
+
+	"github.com/goccy/go-reflect"
 )
 
 // StructLevelFunc accepts all values needed for struct level validation
@@ -22,7 +23,6 @@ func wrapStructLevelFunc(fn StructLevelFunc) StructLevelFuncCtx {
 // StructLevel contains all the information and helper functions
 // to validate a struct
 type StructLevel interface {
-
 	// Validator returns the main validation object, in case one wants to call validations internally.
 	// this is so you don't have to use anonymous functions to get access to the validate
 	// instance.
@@ -52,7 +52,7 @@ type StructLevel interface {
 	//
 	// tag can be an existing validation tag or just something you make up
 	// and process on the flip side it's up to you.
-	ReportError(field interface{}, fieldName, structFieldName string, tag, param string)
+	ReportError(field any, fieldName, structFieldName string, tag, param string)
 
 	// ReportValidationErrors reports an error just by passing ValidationErrors
 	//
@@ -106,8 +106,7 @@ func (v *validate) ExtractType(field reflect.Value) (reflect.Value, reflect.Kind
 }
 
 // ReportError reports an error just by passing the field and tag information
-func (v *validate) ReportError(field interface{}, fieldName, structFieldName, tag, param string) {
-
+func (v *validate) ReportError(field any, fieldName, structFieldName, tag, param string) {
 	fv, kind, _ := v.extractTypeInternal(reflect.ValueOf(field), false)
 
 	if len(structFieldName) == 0 {
@@ -123,7 +122,6 @@ func (v *validate) ReportError(field interface{}, fieldName, structFieldName, ta
 	}
 
 	if kind == reflect.Invalid {
-
 		v.errs = append(v.errs,
 			&fieldError{
 				v:              v.v,
@@ -161,11 +159,9 @@ func (v *validate) ReportError(field interface{}, fieldName, structFieldName, ta
 //
 // NOTE: this function prepends the current namespace to the relative ones.
 func (v *validate) ReportValidationErrors(relativeNamespace, relativeStructNamespace string, errs ValidationErrors) {
-
 	var err *fieldError
 
 	for i := 0; i < len(errs); i++ {
-
 		err = errs[i].(*fieldError)
 		err.ns = string(append(append(v.ns, relativeNamespace...), err.ns...))
 		err.structNs = string(append(append(v.actualNs, relativeStructNamespace...), err.structNs...))

@@ -7,7 +7,8 @@ import (
 	. "github.com/go-playground/assert/v2"
 	english "github.com/go-playground/locales/en"
 	ut "github.com/go-playground/universal-translator"
-	"github.com/go-playground/validator/v10"
+
+	"github.com/3JoB/validator"
 )
 
 func TestTranslations(t *testing.T) {
@@ -709,7 +710,6 @@ func TestTranslations(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-
 		var fe validator.FieldError
 
 		for _, e := range errs {

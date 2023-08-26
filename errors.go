@@ -3,10 +3,10 @@ package validator
 import (
 	"bytes"
 	"fmt"
-	"reflect"
 	"strings"
 
 	ut "github.com/go-playground/universal-translator"
+	"github.com/goccy/go-reflect"
 )
 
 const (
@@ -24,7 +24,6 @@ type InvalidValidationError struct {
 
 // Error returns InvalidValidationError message
 func (e *InvalidValidationError) Error() string {
-
 	if e.Type == nil {
 		return "validator: (nil)"
 	}
@@ -41,11 +40,9 @@ type ValidationErrors []FieldError
 // All information to create an error message specific to your application is contained within
 // the FieldError found within the ValidationErrors array
 func (ve ValidationErrors) Error() string {
-
 	buff := bytes.NewBufferString("")
 
 	for i := 0; i < len(ve); i++ {
-
 		buff.WriteString(ve[i].Error())
 		buff.WriteString("\n")
 	}
@@ -55,7 +52,6 @@ func (ve ValidationErrors) Error() string {
 
 // Translate translates all of the ValidationErrors
 func (ve ValidationErrors) Translate(ut ut.Translator) ValidationErrorsTranslations {
-
 	trans := make(ValidationErrorsTranslations)
 
 	var fe *fieldError
@@ -78,7 +74,6 @@ func (ve ValidationErrors) Translate(ut ut.Translator) ValidationErrorsTranslati
 
 // FieldError contains all functions to get error details
 type FieldError interface {
-
 	// Tag returns the validation tag that failed. if the
 	// validation was an alias, this will return the
 	// alias name and not the underlying tag that failed.
@@ -130,7 +125,7 @@ type FieldError interface {
 
 	// Value returns the actual field's value in case needed for creating the error
 	// message
-	Value() interface{}
+	Value() any
 
 	// Param returns the param value, in string form for comparison; this will also
 	// help with generating an error message
@@ -172,7 +167,7 @@ type fieldError struct {
 	structNs       string
 	fieldLen       uint8
 	structfieldLen uint8
-	value          interface{}
+	value          any
 	param          string
 	kind           reflect.Kind
 	typ            reflect.Type
@@ -204,7 +199,6 @@ func (fe *fieldError) StructNamespace() string {
 // Field returns the field's name with the tag name taking precedence over the
 // field's actual name.
 func (fe *fieldError) Field() string {
-
 	return fe.ns[len(fe.ns)-int(fe.fieldLen):]
 	// // return fe.field
 	// fld := fe.ns[len(fe.ns)-int(fe.fieldLen):]
@@ -226,7 +220,7 @@ func (fe *fieldError) StructField() string {
 
 // Value returns the actual field's value in case needed for creating the error
 // message
-func (fe *fieldError) Value() interface{} {
+func (fe *fieldError) Value() any {
 	return fe.value
 }
 
@@ -257,7 +251,6 @@ func (fe *fieldError) Error() string {
 // NOTE: if no registered translation can be found, it returns the original
 // untranslated error message.
 func (fe *fieldError) Translate(ut ut.Translator) string {
-
 	m, ok := fe.v.transTagFunc[ut]
 	if !ok {
 		return fe.Error()

@@ -1,6 +1,6 @@
 package validator
 
-import "regexp"
+import "github.com/grafana/regexp"
 
 const (
 	alphaRegexString                 = "^[a-zA-Z]+$"
